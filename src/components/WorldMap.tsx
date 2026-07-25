@@ -490,6 +490,42 @@ export function WorldMap(props: Props) {
         </Button>
       </div>
 
+      {/* Hover readout — fixed HUD, never follows the cursor */}
+      <AnimatePresence>
+        {focus && (
+          <motion.div
+            key={focus.id}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="panel pointer-events-none absolute right-6 top-40 z-40 w-[236px] px-4 py-3 md:right-10"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="text-[13px] font-light">{focus.nom}</div>
+              <div className="label-xs">{focus.pays}</div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span
+                className="num text-[28px] leading-none"
+                style={{ color: VERDICT_COLOR[siteVerdict(focus)] }}
+              >
+                {formatLolp(referenceLolp(props.axes, focus))}%
+              </span>
+              <span className="label-xs">LOLP · ref. build</span>
+            </div>
+            <dl className="mt-3 space-y-1.5 border-t border-hairline pt-3">
+              <Readout label="Wind 100 m" value={`${focus.indicateurs.vent_100m_ms.toFixed(1)} m/s`} />
+              <Readout label="Irradiance" value={`${Math.round(focus.indicateurs.irradiance_wm2)} W/m²`} />
+              <Readout label="Air temp" value={`${focus.indicateurs.temperature_c.toFixed(1)} °C`} />
+              <Readout label="Mean PUE" value={focus.indicateurs.pue_moyen.toFixed(3)} />
+              <Readout label="Landform" value={terrainFor(focus.id, focus.latitude).landform.replace("-", " ")} />
+            </dl>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
       <AnimatePresence>
         {!hoveredId && (
           <motion.div
