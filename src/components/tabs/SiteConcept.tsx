@@ -157,7 +157,14 @@ export default function SiteConcept(props: {
 }) {
   return (
     <div className="h-[420px] w-full overflow-hidden rounded-xl border border-hairline bg-[#05070b]">
-      <Canvas camera={{ position: [0, 20, 55], fov: 45 }} dpr={[1, 1.8]}>
+      <Canvas
+        camera={{ position: [0, 20, 55], fov: 45 }}
+        dpr={[1, 1.5]}
+        gl={{ antialias: false, powerPreference: "low-power", failIfMajorPerformanceCaveat: false }}
+        onCreated={({ gl }) => {
+          gl.domElement.addEventListener("webglcontextlost", (e) => e.preventDefault(), false);
+        }}
+      >
         <fog attach="fog" args={["#05070b", 120, 260]} />
         <Scene {...props} />
       </Canvas>

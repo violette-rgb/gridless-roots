@@ -53,7 +53,7 @@ export function SiteDetail({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 12 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className="panel pointer-events-auto absolute right-4 top-4 bottom-16 z-40 flex w-[min(64vw,900px)] flex-col overflow-hidden max-lg:left-4 max-lg:w-auto"
+      className="panel pointer-events-auto absolute right-4 top-24 bottom-6 z-40 flex w-[min(64vw,900px)] flex-col overflow-hidden max-lg:left-4 max-lg:w-auto"
     >
       <motion.header
         initial="hidden"
