@@ -44,6 +44,16 @@ function graticule() {
   return { type: "FeatureCollection" as const, features };
 }
 
+const RAD = Math.PI / 180;
+function angularDistance(a: [number, number], b: [number, number]) {
+  const [lon1, lat1] = a;
+  const [lon2, lat2] = b;
+  const c =
+    Math.sin(lat1 * RAD) * Math.sin(lat2 * RAD) +
+    Math.cos(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.cos((lon2 - lon1) * RAD);
+  return Math.acos(Math.max(-1, Math.min(1, c))) / RAD;
+}
+
 interface Props {
   sites: Site[];
   selectedId: string | null;
