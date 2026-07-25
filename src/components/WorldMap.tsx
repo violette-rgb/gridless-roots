@@ -63,6 +63,10 @@ interface Props {
   onHover: (id: string | null) => void;
   onSelect: (site: Site) => void;
   panelOpen: boolean;
+  /** Fires once the camera has descended to site scale on a sustained hover. */
+  onApproach?: (id: string | null) => void;
+  /** Site whose maquette is on screen — its map tooltip is suppressed. */
+  approachedId?: string | null;
 }
 
 export function WorldMap({
@@ -73,6 +77,8 @@ export function WorldMap({
   onHover,
   onSelect,
   panelOpen,
+  onApproach,
+  approachedId,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
@@ -177,12 +183,13 @@ export function WorldMap({
     };
   }, [project]);
 
-  // Hover: swing the globe over the site's country
+  // Hover: cinematic descent — globe → country → city → site scale.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || selectedId) return;
     const site = sites.find((s) => s.id === hoveredId);
     if (!site) {
+      onApproach?.(null);
       const t = setTimeout(
         () =>
           mapRef.current?.easeTo({
@@ -196,14 +203,23 @@ export function WorldMap({
       );
       return () => clearTimeout(t);
     }
-    map.easeTo({
-      center: [site.longitude, site.latitude],
-      zoom: 4.2,
-      pitch: 0,
-      bearing: 0,
-      duration: 1500,
-    });
-  }, [hoveredId, selectedId, ready, sites]);
+    const target: [number, number] = [site.longitude, site.latitude];
+    // 1 — swing the globe over the country
+    map.easeTo({ center: target, zoom: 4.2, pitch: 0, bearing: 0, duration: 1400 });
+    // 2 — city scale, camera tilts
+    const t2 = setTimeout(() => {
+      mapRef.current?.easeTo({ center: target, zoom: 7.6, pitch: 40, bearing: -12, duration: 1600 });
+    }, 1500);
+    // 3 — site scale, hand over to the physical maquette
+    const t3 = setTimeout(() => {
+      mapRef.current?.easeTo({ center: target, zoom: 11.2, pitch: 62, bearing: -24, duration: 1800 });
+      onApproach?.(site.id);
+    }, 3200);
+    return () => {
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [hoveredId, selectedId, ready, sites, onApproach]);
 
   // Fly to selection
   useEffect(() => {
@@ -277,7 +293,7 @@ export function WorldMap({
               />
 
               <AnimatePresence>
-                {isHovered && (
+                {isHovered && approachedId !== site.id && (
                   <motion.div
                     initial={{ opacity: 0, x: flip ? 12 : -12 }}
                     animate={{ opacity: 1, x: 0 }}
