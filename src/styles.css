@@ -33,7 +33,9 @@
   --color-marginal: var(--marginal);
   --color-failure: var(--failure);
   --color-surface: var(--surface);
+  --color-page: var(--page);
   --color-hairline: var(--hairline);
+
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Newsreader", ui-serif, Georgia, serif;
 }
