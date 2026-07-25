@@ -29,6 +29,8 @@ export const Route = createFileRoute("/sites")({
         content:
           "Interactive globe of eight candidate sites for grid-independent compute, with wind, solar, battery and LOLP for each.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: SitesPage,
@@ -69,6 +71,12 @@ function SitesPage() {
         <p className="mt-3 max-w-[240px] text-[12px] font-light leading-relaxed text-foreground/45">
           Hover a row to swing the globe over its country. Click to open the instrument.
         </p>
+        <button
+          onClick={() => data?.sites[0] && setSelected(data.sites[0])}
+          className="mt-4 rounded-full border border-primary/40 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors duration-200 hover:bg-primary/10"
+        >
+          Open instrument
+        </button>
         <ul className="mt-5 space-y-px">
           {data?.sites.map((s) => {
             const lolp = bestLolp(s);

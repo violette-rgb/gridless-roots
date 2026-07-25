@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 const LINKS = [
   { to: "/", label: "Index" },
   { to: "/sites", label: "Sites" },
+  { to: "/instrument", label: "Instrument" },
   { to: "/method", label: "Method" },
   { to: "/about", label: "About" },
 ] as const;
@@ -30,7 +31,7 @@ export function SiteNav() {
             </Link>
           ))}
           <Link
-            to="/sites"
+            to="/instrument"
             className="hidden rounded-full border border-primary/40 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors duration-200 hover:bg-primary/10 sm:inline-block"
           >
             Open instrument
@@ -60,6 +61,7 @@ export function SiteFooter() {
             title="Instrument"
             items={[
               { to: "/sites", label: "Site explorer" },
+              { to: "/instrument", label: "Sizing instrument" },
               { to: "/method", label: "Physics model" },
             ]}
           />

@@ -16,6 +16,8 @@ export const Route = createFileRoute("/about")({
         content:
           "Scope, assumptions and limits of a decision-support tool for grid-independent compute in Europe.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: AboutPage,
@@ -72,10 +74,10 @@ function AboutPage() {
 
         <div className="mx-auto mt-16 max-w-[1400px]">
           <Link
-            to="/sites"
+            to="/instrument"
             className="rounded-full border border-primary/50 bg-primary/10 px-6 py-3 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors hover:bg-primary/20"
           >
-            Open the site explorer
+            Open the instrument
           </Link>
         </div>
       </section>
