@@ -93,6 +93,12 @@ function Landing() {
               Open the instrument
             </Link>
             <Link
+              to="/guide"
+              className="rounded-full border border-hairline px-6 py-3 text-[11px] uppercase tracking-[0.16em] opacity-75 transition-opacity duration-200 hover:opacity-100"
+            >
+              How to read this tool
+            </Link>
+            <Link
               to="/sites"
               className="rounded-full border border-hairline px-6 py-3 text-[11px] uppercase tracking-[0.16em] opacity-60 transition-opacity duration-200 hover:opacity-100"
             >
@@ -110,11 +116,12 @@ function Landing() {
             variants={fade}
             className="mt-20 grid max-w-3xl grid-cols-2 gap-8 border-t border-hairline pt-8 md:grid-cols-4"
           >
-            <Stat k="8" label="candidate sites" />
+            <Stat k="18" label="candidate sites" />
             <Stat k="8 760" label="hourly points / site" />
             <Stat k="3" label="IT loads simulated" />
             <Stat k="1 %" label="viability threshold" />
           </motion.dl>
+
         </motion.div>
       </section>
 
