@@ -14,8 +14,8 @@ import {
 } from "@/lib/offgrid-data";
 
 const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
-const INITIAL_CENTER: [number, number] = [10, 40];
-const INITIAL_ZOOM = 1.55;
+const INITIAL_CENTER: [number, number] = [10, 45];
+const INITIAL_ZOOM = 2.05;
 
 export type ZoomStage = "globe" | "country" | "city" | "site";
 
@@ -25,6 +25,17 @@ type LineFeature = {
   properties: Record<string, never>;
   geometry: { type: "LineString"; coordinates: number[][] };
 };
+
+type PlanFeature = {
+  type: "Feature";
+  properties: { kind: "pad" | "pv" | "turbine" | "corridor" };
+  geometry:
+    | { type: "Polygon"; coordinates: number[][][] }
+    | { type: "LineString"; coordinates: number[][] }
+    | { type: "Point"; coordinates: number[] };
+};
+
+const emptyPlan = { type: "FeatureCollection" as const, features: [] as PlanFeature[] };
 
 function graticule() {
   const features: LineFeature[] = [];
@@ -59,6 +70,85 @@ function angularDistance(a: [number, number], b: [number, number]) {
     Math.sin(lat1 * RAD) * Math.sin(lat2 * RAD) +
     Math.cos(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.cos((lon2 - lon1) * RAD);
   return Math.acos(Math.max(-1, Math.min(1, c))) / RAD;
+}
+
+function hashSite(id: string) {
+  return [...id].reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) % 997, 17) / 997;
+}
+
+function offsetCoordinate(site: Site, eastKm: number, northKm: number): [number, number] {
+  const lat = site.latitude + northKm / 111.32;
+  const lon = site.longitude + eastKm / (111.32 * Math.max(0.18, Math.cos(site.latitude * RAD)));
+  return [lon, lat];
+}
+
+function rotatedOffset(eastKm: number, northKm: number, angle: number) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [eastKm * c - northKm * s, eastKm * s + northKm * c] as const;
+}
+
+function rectangle(site: Site, cx: number, cy: number, w: number, h: number, angle: number) {
+  const corners = [
+    [-w / 2, -h / 2],
+    [w / 2, -h / 2],
+    [w / 2, h / 2],
+    [-w / 2, h / 2],
+    [-w / 2, -h / 2],
+  ].map(([x, y]) => {
+    const [rx, ry] = rotatedOffset(cx + x, cy + y, angle);
+    return offsetCoordinate(site, rx, ry);
+  });
+  return corners;
+}
+
+function sitePlanFor(site: Site) {
+  const seed = hashSite(site.id);
+  const angle = seed * Math.PI * 2;
+  const ridgeAngle = angle + Math.PI / 2.8;
+  const features: PlanFeature[] = [];
+
+  features.push({
+    type: "Feature",
+    properties: { kind: "pad" },
+    geometry: { type: "Polygon", coordinates: [rectangle(site, 0, 0, 1.2, 0.82, angle)] },
+  });
+
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 5; col++) {
+      features.push({
+        type: "Feature",
+        properties: { kind: "pv" },
+        geometry: {
+          type: "Polygon",
+          coordinates: [rectangle(site, -1.85 + col * 0.42, 0.95 + row * 0.23, 0.28, 0.14, angle)],
+        },
+      });
+    }
+  }
+
+  const corridor: number[][] = [];
+  for (let i = 0; i < 10; i++) {
+    const t = (i - 4.5) / 4.5;
+    const wave = Math.sin((i + seed * 7) * 0.9) * 0.32;
+    const [x, y] = rotatedOffset(t * 3.2, -1.15 + wave, ridgeAngle);
+    const point = offsetCoordinate(site, x, y);
+    corridor.push(point);
+    if (i % 2 === 0 || i === 9) {
+      features.push({
+        type: "Feature",
+        properties: { kind: "turbine" },
+        geometry: { type: "Point", coordinates: point },
+      });
+    }
+  }
+  features.push({
+    type: "Feature",
+    properties: { kind: "corridor" },
+    geometry: { type: "LineString", coordinates: corridor },
+  });
+
+  return { type: "FeatureCollection" as const, features };
 }
 
 interface Props {
@@ -172,41 +262,37 @@ export function WorldMap({
           source: "graticule",
           paint: { "line-color": "#7fd6f2", "line-opacity": 0.13, "line-width": 0.55 },
         });
-        try {
-          // Free MapLibre demo terrain tiles: enough relief signal for the city/site descent,
-          // no key and no dependency on the basemap provider.
-          if (!m.getSource("terrain-dem")) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (m as any).addSource("terrain-dem", {
-              type: "raster-dem",
-              tiles: ["https://demotiles.maplibre.org/terrain-tiles/{z}/{x}/{y}.png"],
-              tileSize: 256,
-              maxzoom: 12,
-              encoding: "terrarium",
-            });
-          }
-          const firstSymbol = m.getStyle().layers?.find((layer) => layer.type === "symbol")?.id;
-          if (!m.getLayer("terrain-hillshade")) {
-            m.addLayer(
-              {
-                id: "terrain-hillshade",
-                type: "hillshade",
-                source: "terrain-dem",
-                paint: {
-                  "hillshade-shadow-color": "#07111b",
-                  "hillshade-highlight-color": "#9ec6dc",
-                  "hillshade-accent-color": "#25485d",
-                  "hillshade-exaggeration": 0.42,
-                },
-              },
-              firstSymbol,
-            );
-          }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (m as any).setTerrain?.({ source: "terrain-dem", exaggeration: 0.75 });
-        } catch (e) {
-          console.warn("[maplibre] terrain overlay unavailable", e);
-        }
+        m.addSource("site-plan", { type: "geojson", data: emptyPlan });
+        m.addLayer({
+          id: "site-plan-fill",
+          type: "fill",
+          source: "site-plan",
+          filter: ["in", ["get", "kind"], ["literal", ["pad", "pv"]]],
+          paint: {
+            "fill-color": ["match", ["get", "kind"], "pad", "#e9f7ff", "pv", "#1ab4e8", "#7fd6f2"],
+            "fill-opacity": ["match", ["get", "kind"], "pad", 0.78, "pv", 0.44, 0.3],
+          },
+        });
+        m.addLayer({
+          id: "site-plan-line",
+          type: "line",
+          source: "site-plan",
+          filter: ["==", ["get", "kind"], "corridor"],
+          paint: { "line-color": "#7fd6f2", "line-opacity": 0.8, "line-width": 2, "line-dasharray": [1.2, 1] },
+        });
+        m.addLayer({
+          id: "site-plan-turbines",
+          type: "circle",
+          source: "site-plan",
+          filter: ["==", ["get", "kind"], "turbine"],
+          paint: {
+            "circle-color": "#f8fbff",
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3, 12, 6],
+            "circle-stroke-color": "#7fd6f2",
+            "circle-stroke-width": 1.4,
+            "circle-opacity": 0.95,
+          },
+        });
         // In dark-matter the background IS the land, and water is painted over
         // it. Push them apart so continents read clearly on the globe.
         const paint = (id: string, prop: string, value: string | number) => {
@@ -322,7 +408,7 @@ export function WorldMap({
     // 1 — country scale: keep a readable national outline before descending.
     map.flyTo({
       center: target,
-      zoom: 3.45,
+      zoom: 4.35,
       pitch: 0,
       bearing: 0,
       duration: 1150,
@@ -336,7 +422,7 @@ export function WorldMap({
       updateStage("city", site.id);
       mapRef.current?.flyTo({
         center: target,
-        zoom: 7.15,
+        zoom: 8.25,
         pitch: 38,
         bearing: -12,
         duration: 1350,
@@ -349,9 +435,11 @@ export function WorldMap({
     const t3 = setTimeout(() => {
       if (descentRef.current !== descent) return;
       updateStage("site", site.id);
+      const source = mapRef.current?.getSource("site-plan");
+      if (source && "setData" in source) source.setData(sitePlanFor(site));
       mapRef.current?.flyTo({
         center: target,
-        zoom: 11.35,
+        zoom: 12.2,
         pitch: 64,
         bearing: -24,
         duration: 1600,
@@ -376,6 +464,8 @@ export function WorldMap({
     updateStage("site", site.id);
     onApproach?.(null);
     map.stop();
+    const source = map.getSource("site-plan");
+    if (source && "setData" in source) source.setData(sitePlanFor(site));
     map.flyTo({
       center: [site.longitude, site.latitude],
       zoom: 10.5,
