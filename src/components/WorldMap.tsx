@@ -5,9 +5,12 @@ import { Button } from "@/components/ui/button";
 import {
   type GrilleAxes,
   siteVerdict,
+  referenceLolp,
+  formatLolp,
   VERDICT_COLOR,
   type Site,
 } from "@/lib/offgrid-data";
+import { terrainFor } from "@/lib/terrain";
 
 export type ZoomStage = "globe" | "country" | "city" | "site";
 
