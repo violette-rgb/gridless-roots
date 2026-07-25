@@ -4,12 +4,15 @@ import { useMemo, useState } from "react";
 import { SiteDetail } from "@/components/SiteDetail";
 import { SiteFooter } from "@/components/SiteNav";
 import {
-  bestLolp,
+  capexForBand,
   classify,
+  formatCapex,
   formatLolp,
+  headlineLolp,
   loadDataset,
   VERDICT_COLOR,
 } from "@/lib/offgrid-data";
+
 import { useHydrated } from "@/lib/hooks";
 
 export const Route = createFileRoute("/instrument")({
