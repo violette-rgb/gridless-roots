@@ -14,8 +14,10 @@ import {
 } from "@/lib/offgrid-data";
 
 const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
-const INITIAL_CENTER: [number, number] = [10, 40];
-const INITIAL_ZOOM = 1.55;
+const INITIAL_CENTER: [number, number] = [10, 45];
+const INITIAL_ZOOM = 2.05;
+
+export type ZoomStage = "globe" | "country" | "city" | "site";
 
 
 type LineFeature = {
@@ -23,6 +25,23 @@ type LineFeature = {
   properties: Record<string, never>;
   geometry: { type: "LineString"; coordinates: number[][] };
 };
+
+type PlanFeature = {
+  type: "Feature";
+  properties: { kind: "pad" | "pv" | "turbine" | "corridor" };
+  geometry:
+    | { type: "Polygon"; coordinates: number[][][] }
+    | { type: "LineString"; coordinates: number[][] }
+    | { type: "Point"; coordinates: number[] };
+};
+
+const emptyPlan = { type: "FeatureCollection" as const, features: [] as PlanFeature[] };
+
+type GeoJsonSourceLike = { setData: (data: typeof emptyPlan) => void };
+
+function isGeoJsonSource(source: unknown): source is GeoJsonSourceLike {
+  return typeof source === "object" && source !== null && "setData" in source;
+}
 
 function graticule() {
   const features: LineFeature[] = [];
@@ -59,6 +78,85 @@ function angularDistance(a: [number, number], b: [number, number]) {
   return Math.acos(Math.max(-1, Math.min(1, c))) / RAD;
 }
 
+function hashSite(id: string) {
+  return [...id].reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) % 997, 17) / 997;
+}
+
+function offsetCoordinate(site: Site, eastKm: number, northKm: number): [number, number] {
+  const lat = site.latitude + northKm / 111.32;
+  const lon = site.longitude + eastKm / (111.32 * Math.max(0.18, Math.cos(site.latitude * RAD)));
+  return [lon, lat];
+}
+
+function rotatedOffset(eastKm: number, northKm: number, angle: number) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [eastKm * c - northKm * s, eastKm * s + northKm * c] as const;
+}
+
+function rectangle(site: Site, cx: number, cy: number, w: number, h: number, angle: number) {
+  const corners = [
+    [-w / 2, -h / 2],
+    [w / 2, -h / 2],
+    [w / 2, h / 2],
+    [-w / 2, h / 2],
+    [-w / 2, -h / 2],
+  ].map(([x, y]) => {
+    const [rx, ry] = rotatedOffset(cx + x, cy + y, angle);
+    return offsetCoordinate(site, rx, ry);
+  });
+  return corners;
+}
+
+function sitePlanFor(site: Site) {
+  const seed = hashSite(site.id);
+  const angle = seed * Math.PI * 2;
+  const ridgeAngle = angle + Math.PI / 2.8;
+  const features: PlanFeature[] = [];
+
+  features.push({
+    type: "Feature",
+    properties: { kind: "pad" },
+    geometry: { type: "Polygon", coordinates: [rectangle(site, 0, 0, 1.2, 0.82, angle)] },
+  });
+
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 5; col++) {
+      features.push({
+        type: "Feature",
+        properties: { kind: "pv" },
+        geometry: {
+          type: "Polygon",
+          coordinates: [rectangle(site, -1.85 + col * 0.42, 0.95 + row * 0.23, 0.28, 0.14, angle)],
+        },
+      });
+    }
+  }
+
+  const corridor: number[][] = [];
+  for (let i = 0; i < 10; i++) {
+    const t = (i - 4.5) / 4.5;
+    const wave = Math.sin((i + seed * 7) * 0.9) * 0.32;
+    const [x, y] = rotatedOffset(t * 3.2, -1.15 + wave, ridgeAngle);
+    const point = offsetCoordinate(site, x, y);
+    corridor.push(point);
+    if (i % 2 === 0 || i === 9) {
+      features.push({
+        type: "Feature",
+        properties: { kind: "turbine" },
+        geometry: { type: "Point", coordinates: point },
+      });
+    }
+  }
+  features.push({
+    type: "Feature",
+    properties: { kind: "corridor" },
+    geometry: { type: "LineString", coordinates: corridor },
+  });
+
+  return { type: "FeatureCollection" as const, features };
+}
+
 interface Props {
   sites: Site[];
   axes: GrilleAxes;
@@ -71,6 +169,8 @@ interface Props {
   onApproach?: (id: string | null) => void;
   /** Site whose maquette is on screen — its map tooltip is suppressed. */
   approachedId?: string | null;
+  /** Reports the active descent scale: globe → country → city → site. */
+  onZoomStageChange?: (stage: ZoomStage, siteId: string | null) => void;
 }
 
 export function WorldMap({
@@ -83,15 +183,25 @@ export function WorldMap({
   panelOpen,
   onApproach,
   approachedId,
+  onZoomStageChange,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
+  const descentRef = useRef(0);
   const [ready, setReady] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
   const [mapEpoch, setMapEpoch] = useState(0);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [center, setCenter] = useState<[number, number]>(INITIAL_CENTER);
+  const [zoomStage, setZoomStage] = useState<ZoomStage>("globe");
 
+  const updateStage = useCallback(
+    (stage: ZoomStage, siteId: string | null) => {
+      setZoomStage(stage);
+      onZoomStageChange?.(stage, siteId);
+    },
+    [onZoomStageChange],
+  );
 
   const project = useCallback(
     (map: MLMap) => {
@@ -156,7 +266,38 @@ export function WorldMap({
           id: "graticule",
           type: "line",
           source: "graticule",
-          paint: { "line-color": "#7fd6f2", "line-opacity": 0.07, "line-width": 0.5 },
+          paint: { "line-color": "#7fd6f2", "line-opacity": 0.13, "line-width": 0.55 },
+        });
+        m.addSource("site-plan", { type: "geojson", data: emptyPlan });
+        m.addLayer({
+          id: "site-plan-fill",
+          type: "fill",
+          source: "site-plan",
+          filter: ["in", ["get", "kind"], ["literal", ["pad", "pv"]]],
+          paint: {
+            "fill-color": ["match", ["get", "kind"], "pad", "#e9f7ff", "pv", "#1ab4e8", "#7fd6f2"],
+            "fill-opacity": ["match", ["get", "kind"], "pad", 0.78, "pv", 0.44, 0.3],
+          },
+        });
+        m.addLayer({
+          id: "site-plan-line",
+          type: "line",
+          source: "site-plan",
+          filter: ["==", ["get", "kind"], "corridor"],
+          paint: { "line-color": "#7fd6f2", "line-opacity": 0.8, "line-width": 2, "line-dasharray": [1.2, 1] },
+        });
+        m.addLayer({
+          id: "site-plan-turbines",
+          type: "circle",
+          source: "site-plan",
+          filter: ["==", ["get", "kind"], "turbine"],
+          paint: {
+            "circle-color": "#f8fbff",
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3, 12, 6],
+            "circle-stroke-color": "#7fd6f2",
+            "circle-stroke-width": 1.4,
+            "circle-opacity": 0.95,
+          },
         });
         // In dark-matter the background IS the land, and water is painted over
         // it. Push them apart so continents read clearly on the globe.
@@ -168,13 +309,13 @@ export function WorldMap({
             /* layer does not support this paint property */
           }
         };
-        paint("background", "background-color", "#334455");
-        paint("landcover", "fill-color", "#3b4d5c");
-        paint("landcover", "fill-opacity", 0.6);
-        paint("park_national_park", "fill-opacity", 0.15);
-        paint("park_nature_reserve", "fill-opacity", 0.15);
-        paint("landuse", "fill-opacity", 0.12);
-        paint("landuse_residential", "fill-opacity", 0.12);
+        paint("background", "background-color", "#405463");
+        paint("landcover", "fill-color", "#526a7a");
+        paint("landcover", "fill-opacity", 0.72);
+        paint("park_national_park", "fill-opacity", 0.24);
+        paint("park_nature_reserve", "fill-opacity", 0.24);
+        paint("landuse", "fill-opacity", 0.2);
+        paint("landuse_residential", "fill-opacity", 0.2);
         paint("water", "fill-color", "#0a1a26");
         paint("water_shadow", "fill-color", "#08151f");
         paint("waterway", "line-color", "#123244");
@@ -182,13 +323,13 @@ export function WorldMap({
           const id = layer.id;
           if (layer.type === "line" && /boundary/i.test(id)) {
             paint(id, "line-color", "#dff2fb");
-            paint(id, "line-opacity", 0.5);
+            paint(id, "line-opacity", 0.72);
           } else if (layer.type === "symbol") {
             paint(id, "text-color", "#f2f8fc");
             paint(id, "text-halo-color", "#101d27");
             paint(id, "text-halo-width", 1.4);
           } else if (layer.type === "line" && /road|bridge|tunnel|rail|aeroway/i.test(id)) {
-            paint(id, "line-opacity", 0.18);
+            paint(id, "line-opacity", 0.28);
           }
         }
 
@@ -218,8 +359,10 @@ export function WorldMap({
   const resetToGlobe = useCallback(() => {
     onHover(null);
     onApproach?.(null);
+    updateStage("globe", null);
     const map = mapRef.current;
     if (!map || !ready) return;
+    map.stop();
     map.easeTo({
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
@@ -227,21 +370,24 @@ export function WorldMap({
       bearing: 0,
       duration: 1200,
     });
-  }, [onApproach, onHover, ready]);
+  }, [onApproach, onHover, ready, updateStage]);
 
   const reloadMap = useCallback(() => {
     onHover(null);
     onApproach?.(null);
+    updateStage("globe", null);
     setMapEpoch((n) => n + 1);
-  }, [onApproach, onHover]);
+  }, [onApproach, onHover, updateStage]);
 
   // Hover: cinematic descent — globe → country → city → site scale.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || selectedId) return;
     const site = sites.find((s) => s.id === hoveredId);
+    const descent = ++descentRef.current;
     if (!site) {
       onApproach?.(null);
+      updateStage("globe", null);
       const t = setTimeout(
         () =>
           mapRef.current?.easeTo({
@@ -256,22 +402,64 @@ export function WorldMap({
       return () => clearTimeout(t);
     }
     const target: [number, number] = [site.longitude, site.latitude];
-    // 1 — swing the globe over the country
-    map.easeTo({ center: target, zoom: 4.2, pitch: 0, bearing: 0, duration: 850 });
-    // 2 — city scale, camera tilts
+    const padding = {
+      left: Math.min(340, Math.round(window.innerWidth * 0.28)),
+      right: Math.min(90, Math.round(window.innerWidth * 0.06)),
+      top: 90,
+      bottom: 110,
+    };
+    map.stop();
+    onApproach?.(null);
+    updateStage("country", site.id);
+    // 1 — country scale: keep a readable national outline before descending.
+    map.flyTo({
+      center: target,
+      zoom: 4.35,
+      pitch: 0,
+      bearing: 0,
+      duration: 1150,
+      curve: 1.65,
+      padding,
+      essential: true,
+    });
+    // 2 — city scale: labels/roads/terrain become legible.
     const t2 = setTimeout(() => {
-      mapRef.current?.easeTo({ center: target, zoom: 7.6, pitch: 40, bearing: -12, duration: 950 });
-    }, 900);
-    // 3 — site scale, hand over to the physical maquette
+      if (descentRef.current !== descent) return;
+      updateStage("city", site.id);
+      mapRef.current?.flyTo({
+        center: target,
+        zoom: 8.25,
+        pitch: 38,
+        bearing: -12,
+        duration: 1350,
+        curve: 1.25,
+        padding,
+        essential: true,
+      });
+    }, 1250);
+    // 3 — site scale: hand over to the physical topographic maquette.
     const t3 = setTimeout(() => {
-      mapRef.current?.easeTo({ center: target, zoom: 11.2, pitch: 62, bearing: -24, duration: 1200 });
+      if (descentRef.current !== descent) return;
+      updateStage("site", site.id);
+      const source = mapRef.current?.getSource("site-plan");
+      if (isGeoJsonSource(source)) source.setData(sitePlanFor(site));
+      mapRef.current?.flyTo({
+        center: target,
+        zoom: 12.2,
+        pitch: 64,
+        bearing: -24,
+        duration: 1600,
+        curve: 1.05,
+        padding,
+        essential: true,
+      });
       onApproach?.(site.id);
-    }, 1950);
+    }, 2750);
     return () => {
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [hoveredId, selectedId, ready, sites, onApproach]);
+  }, [hoveredId, selectedId, ready, sites, onApproach, updateStage]);
 
   // Fly to selection
   useEffect(() => {
@@ -279,6 +467,11 @@ export function WorldMap({
     if (!map || !ready) return;
     const site = sites.find((s) => s.id === selectedId);
     if (!site) return;
+    updateStage("site", site.id);
+    onApproach?.(null);
+    map.stop();
+    const source = map.getSource("site-plan");
+    if (isGeoJsonSource(source)) source.setData(sitePlanFor(site));
     map.flyTo({
       center: [site.longitude, site.latitude],
       zoom: 10.5,
@@ -290,11 +483,11 @@ export function WorldMap({
       essential: true,
       padding: { right: Math.round(window.innerWidth * 0.55), left: 0, top: 0, bottom: 0 },
     });
-  }, [selectedId, ready, sites]);
+  }, [selectedId, ready, sites, onApproach, updateStage]);
 
 
   return (
-    <div className="absolute inset-0 bg-page">
+    <div className="absolute inset-0 bg-page" data-map-stage={zoomStage}>
       <FallbackGlobe active={!ready || mapFailed} />
       <div
         ref={container}
