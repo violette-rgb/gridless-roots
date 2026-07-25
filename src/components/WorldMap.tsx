@@ -187,6 +187,8 @@ export function WorldMap({
         {sites.map((site, i) => {
           const pos = positions[site.id];
           if (!pos) return null;
+          if (angularDistance(center, [site.longitude, site.latitude]) > 78) return null;
+
           const lolp = bestLolp(site);
           const color = VERDICT_COLOR[classify(lolp)];
           const isHovered = hoveredId === site.id;
