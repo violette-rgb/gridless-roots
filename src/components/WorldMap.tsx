@@ -257,7 +257,6 @@ export function WorldMap({
         attributionControl: { compact: true },
         maxPitch: 75,
         fadeDuration: 120,
-        antialias: true,
       });
       mapRef.current = map;
       const m = map;
@@ -456,7 +455,7 @@ export function WorldMap({
         duration: 5200,
         curve: 1.45,
         speed: 0.9,
-        screenSpeed: undefined,
+
         easing: (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
         padding: {
           left: Math.min(340, Math.round(window.innerWidth * 0.28)),
