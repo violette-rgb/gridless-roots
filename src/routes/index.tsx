@@ -79,9 +79,10 @@ function Landing() {
             variants={fade}
             className="mt-8 max-w-lg text-[15px] font-light leading-relaxed text-foreground/75"
           >
-            A grid connection in Europe takes seven to ten years. We simulate eight
+            A grid connection in Europe takes seven to ten years. We simulate eighteen
             candidate sites hour by hour across a full meteorological year and answer one
             question: can wind, solar and storage alone hold the load?
+
           </motion.p>
 
           <motion.div variants={fade} className="mt-10 flex flex-wrap gap-3">
