@@ -139,19 +139,36 @@ function Landing() {
       </Section>
 
       {/* Sites preview */}
-      <Section eyebrow="The sites" title="Eight locations, ranked by best achievable LOLP.">
-        <ul className="divide-y divide-hairline border-y border-hairline">
+      <Section
+        eyebrow="The sites"
+        title="Eighteen locations, ranked by the hardest test we run."
+      >
+        <p className="-mt-8 mb-8 max-w-xl text-[13px] font-light leading-relaxed text-foreground/72">
+          Each row shows two numbers. <span className="text-primary">LOLP @ 50 MW</span> is
+          the share of the year the site cannot power a 50 MW compute load, even with the
+          largest sizing we simulate. <span className="text-primary">CAPEX ≤ 1 %</span> is
+          the cheapest build that keeps outages under 1 % of the year — a dash means no
+          sizing in the grid gets there.
+        </p>
+        <div className="label-xs flex justify-between border-b border-hairline pb-3">
+          <span>Site</span>
+          <span className="flex gap-8">
+            <span className="w-28 text-right">LOLP @ 50 MW</span>
+            <span className="hidden w-32 text-right sm:inline">CAPEX ≤ 1 % LOLP</span>
+          </span>
+        </div>
+        <ul className="divide-y divide-hairline border-b border-hairline">
           {data?.sites
             .slice()
-            .sort((a, b) => bestLolp(a) - bestLolp(b))
+            .sort((a, b) => headlineLolp(a) - headlineLolp(b))
             .map((s) => {
-              const lolp = bestLolp(s);
+              const lolp = headlineLolp(s);
               const color = VERDICT_COLOR[classify(lolp)];
               return (
                 <li key={s.id}>
                   <Link
-                    to="/sites"
-                    className="group flex items-baseline justify-between py-5 transition-opacity duration-200 hover:opacity-100 md:py-6"
+                    to="/instrument"
+                    className="group flex items-baseline justify-between py-5 transition-opacity duration-200 hover:opacity-100"
                   >
                     <span className="flex items-baseline gap-4">
                       <span
@@ -163,14 +180,13 @@ function Landing() {
                       </span>
                       <span className="label-xs">{s.pays}</span>
                     </span>
-                    <span className="flex items-baseline gap-2">
-                      <span
-                        className="num text-xl font-extralight md:text-2xl"
-                        style={{ color }}
-                      >
-                        {formatLolp(lolp)}
+                    <span className="flex items-baseline gap-8">
+                      <span className="num w-28 text-right text-xl font-extralight" style={{ color }}>
+                        {formatLolp(lolp)} %
                       </span>
-                      <span className="label-xs">% LOLP</span>
+                      <span className="num hidden w-32 text-right text-[13px] font-light text-foreground/72 sm:inline">
+                        {formatCapex(capexForBand(s))}
+                      </span>
                     </span>
                   </Link>
                 </li>
@@ -179,6 +195,7 @@ function Landing() {
           {!data && <li className="label-xs py-6">Loading site index…</li>}
         </ul>
       </Section>
+
 
       {/* CTA */}
       <section className="px-6 pb-24 md:px-10">
