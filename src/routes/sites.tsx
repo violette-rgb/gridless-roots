@@ -111,8 +111,11 @@ function SitesPage() {
                 <li key={s.id}>
                   <button
                     onMouseEnter={() => setHovered(s.id)}
-                    onMouseLeave={() => setHovered(null)}
-                    onClick={() => setSelected(s)}
+                    onFocus={() => setHovered(s.id)}
+                    onClick={() => {
+                      setHovered(s.id);
+                      setSelected(s);
+                    }}
                     className={`group flex w-full items-baseline justify-between border-b border-hairline py-2.5 text-left transition-opacity duration-200 ${
                       active ? "opacity-100" : "opacity-75 hover:opacity-95"
                     }`}
