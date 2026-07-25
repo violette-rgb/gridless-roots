@@ -44,6 +44,16 @@ function graticule() {
   return { type: "FeatureCollection" as const, features };
 }
 
+const RAD = Math.PI / 180;
+function angularDistance(a: [number, number], b: [number, number]) {
+  const [lon1, lat1] = a;
+  const [lon2, lat2] = b;
+  const c =
+    Math.sin(lat1 * RAD) * Math.sin(lat2 * RAD) +
+    Math.cos(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.cos((lon2 - lon1) * RAD);
+  return Math.acos(Math.max(-1, Math.min(1, c))) / RAD;
+}
+
 interface Props {
   sites: Site[];
   selectedId: string | null;
@@ -65,6 +75,8 @@ export function WorldMap({
   const mapRef = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [center, setCenter] = useState<[number, number]>([10, 40]);
+
 
   const project = useCallback(
     (map: MLMap) => {
@@ -87,8 +99,8 @@ export function WorldMap({
       map = new maplibregl.Map({
         container: container.current,
         style: STYLE_URL,
-        center: [10, 55],
-        zoom: 3.2,
+        center: [10, 40],
+        zoom: 1.55,
         pitch: 0,
         attributionControl: { compact: true },
         maxPitch: 75,
@@ -98,6 +110,11 @@ export function WorldMap({
       m.on("error", (e) => console.error("[maplibre]", e?.error ?? e));
       m.on("load", () => {
         m.resize();
+        try {
+          m.setProjection({ type: "globe" });
+        } catch (e) {
+          console.error("[maplibre] globe projection unavailable", e);
+        }
         m.addSource("graticule", { type: "geojson", data: graticule() });
         m.addLayer({
           id: "graticule",
@@ -106,9 +123,13 @@ export function WorldMap({
           paint: { "line-color": "#7fd6f2", "line-opacity": 0.07, "line-width": 0.5 },
         });
         setReady(true);
+        setCenter(m.getCenter().toArray() as [number, number]);
         project(m);
       });
-      m.on("move", () => project(m));
+      m.on("move", () => {
+        project(m);
+        setCenter(m.getCenter().toArray() as [number, number]);
+      });
       m.on("render", () => project(m));
       requestAnimationFrame(() => m.resize());
     })();
@@ -119,15 +140,40 @@ export function WorldMap({
     };
   }, [project]);
 
+  // Hover: swing the globe over the site's country
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || selectedId) return;
+    const site = sites.find((s) => s.id === hoveredId);
+    if (!site) {
+      const t = setTimeout(
+        () =>
+          mapRef.current?.easeTo({
+            center: [10, 40],
+            zoom: 1.55,
+            pitch: 0,
+            bearing: 0,
+            duration: 1600,
+          }),
+        220,
+      );
+      return () => clearTimeout(t);
+    }
+    map.easeTo({
+      center: [site.longitude, site.latitude],
+      zoom: 4.2,
+      pitch: 0,
+      bearing: 0,
+      duration: 1500,
+    });
+  }, [hoveredId, selectedId, ready, sites]);
+
   // Fly to selection
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
     const site = sites.find((s) => s.id === selectedId);
-    if (!site) {
-      map.easeTo({ center: [10, 55], zoom: 3.2, pitch: 0, bearing: 0, duration: 1600, padding: { left: 0, right: 0 } });
-      return;
-    }
+    if (!site) return;
     map.flyTo({
       center: [site.longitude, site.latitude],
       zoom: 10.5,
@@ -141,6 +187,7 @@ export function WorldMap({
     });
   }, [selectedId, ready, sites]);
 
+
   return (
     <div className="absolute inset-0">
       <div ref={container} className="absolute inset-0 h-full w-full" />
@@ -150,6 +197,8 @@ export function WorldMap({
         {sites.map((site, i) => {
           const pos = positions[site.id];
           if (!pos) return null;
+          if (angularDistance(center, [site.longitude, site.latitude]) > 78) return null;
+
           const lolp = bestLolp(site);
           const color = VERDICT_COLOR[classify(lolp)];
           const isHovered = hoveredId === site.id;
