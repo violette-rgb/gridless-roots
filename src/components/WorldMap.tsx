@@ -65,6 +65,8 @@ export function WorldMap({
   const mapRef = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [center, setCenter] = useState<[number, number]>([10, 40]);
+
 
   const project = useCallback(
     (map: MLMap) => {
