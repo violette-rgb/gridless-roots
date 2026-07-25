@@ -122,7 +122,7 @@ export function SiteDetail({
             {tab === 1 && <ProfileTab site={site} />}
             {tab === 2 && <ModelTab />}
             {tab === 3 && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <p className="label-xs">
                   {turbines} turbines · {pv} MWp solar · {batt.toLocaleString("en-US")} MWh
                   storage · {pIt} MW IT
@@ -136,6 +136,30 @@ export function SiteDetail({
                     <SiteConcept turbines={turbines} pv={pv} batt={batt} pIt={pIt} />
                   </Suspense>
                 ) : null}
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline sm:grid-cols-4">
+                  <Spec label="Wind rated" value={`${turbines * 6} MW`} />
+                  <Spec label="Solar rated" value={`${pv} MWp`} />
+                  <Spec label="Storage" value={`${batt.toLocaleString("en-US")} MWh`} />
+                  <Spec
+                    label="Storage autonomy"
+                    value={`${(batt / (pIt * site.indicateurs.pue_moyen)).toFixed(1)} h`}
+                  />
+                  <Spec label="Turbine class" value="6 MW · 150 m rotor" />
+                  <Spec
+                    label="Wind footprint"
+                    value={`${(turbines * 0.54).toFixed(1)} km²`}
+                  />
+                  <Spec label="Solar footprint" value={`${(pv * 1.2).toFixed(0)} ha`} />
+                  <Spec
+                    label="Compute halls"
+                    value={`${Math.max(2, Math.round(pIt / 10))} × 5 MW`}
+                  />
+                </div>
+                <p className="max-w-xl text-sm font-light leading-relaxed text-foreground/50">
+                  Massing is indicative: turbine spacing at five rotor diameters, single-axis
+                  PV rows at 1.2 ha per MWp, and containerised storage at 100 MWh per block.
+                  Drag to orbit the site.
+                </p>
               </div>
             )}
           </motion.div>
