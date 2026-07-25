@@ -205,16 +205,16 @@ export function WorldMap({
     }
     const target: [number, number] = [site.longitude, site.latitude];
     // 1 — swing the globe over the country
-    map.easeTo({ center: target, zoom: 4.2, pitch: 0, bearing: 0, duration: 1400 });
+    map.easeTo({ center: target, zoom: 4.2, pitch: 0, bearing: 0, duration: 850 });
     // 2 — city scale, camera tilts
     const t2 = setTimeout(() => {
-      mapRef.current?.easeTo({ center: target, zoom: 7.6, pitch: 40, bearing: -12, duration: 1600 });
-    }, 1500);
+      mapRef.current?.easeTo({ center: target, zoom: 7.6, pitch: 40, bearing: -12, duration: 950 });
+    }, 900);
     // 3 — site scale, hand over to the physical maquette
     const t3 = setTimeout(() => {
-      mapRef.current?.easeTo({ center: target, zoom: 11.2, pitch: 62, bearing: -24, duration: 1800 });
+      mapRef.current?.easeTo({ center: target, zoom: 11.2, pitch: 62, bearing: -24, duration: 1200 });
       onApproach?.(site.id);
-    }, 3200);
+    }, 1950);
     return () => {
       clearTimeout(t2);
       clearTimeout(t3);
@@ -262,7 +262,7 @@ export function WorldMap({
           return (
             <div
               key={site.id}
-              className="pointer-events-auto absolute"
+              className="pointer-events-auto absolute flex h-11 w-11 items-center justify-center"
               style={{
                 left: pos.x,
                 top: pos.y,
@@ -271,12 +271,21 @@ export function WorldMap({
                 transition: "opacity 300ms ease",
                 zIndex: isHovered ? 30 : 10,
               }}
-              onMouseEnter={() => onHover(site.id)}
-              onMouseLeave={() => onHover(null)}
-              onClick={() => onSelect(site)}
+              onPointerEnter={() => onHover(site.id)}
+              onFocus={() => onHover(site.id)}
+              onClick={() => {
+                onHover(site.id);
+                onSelect(site);
+              }}
               role="button"
+              aria-label={`${site.nom}, ${site.pays}`}
               tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && onSelect(site)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  onHover(site.id);
+                  onSelect(site);
+                }
+              }}
             >
               <span
                 className="pulse-ring absolute left-1/2 top-1/2 block h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border"
@@ -302,8 +311,8 @@ export function WorldMap({
                     className="absolute top-1/2 flex items-center gap-0"
                     style={
                       flip
-                        ? { right: 10, flexDirection: "row-reverse" }
-                        : { left: 10 }
+                        ? { right: 30, flexDirection: "row-reverse" }
+                        : { left: 30 }
                     }
                   >
                     <span
