@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { lazy, Suspense, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import { terrainFor } from "@/lib/terrain";
-
-const SiteConcept = lazy(() => import("@/components/tabs/SiteConcept"));
+import SiteConcept from "@/components/tabs/SiteConcept";
 import { WorldMap } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
 import {
@@ -169,23 +168,15 @@ function SitesPage() {
                 {terrainFor(maquette.id, maquette.latitude).landform.replace("-", " ")}
               </div>
             </div>
-            <Suspense
-              fallback={
-                <div className="label-xs flex h-[240px] items-center justify-center">
-                  Building terrain…
-                </div>
-              }
-            >
-              <SiteConcept
-                siteId={maquette.id}
-                latitude={maquette.latitude}
-                turbines={50}
-                pv={100}
-                batt={800}
-                pIt={50}
-                heightClass="h-[240px]"
-              />
-            </Suspense>
+            <SiteConcept
+              siteId={maquette.id}
+              latitude={maquette.latitude}
+              turbines={50}
+              pv={100}
+              batt={800}
+              pIt={50}
+              heightClass="h-[240px]"
+            />
             <p className="px-1 pt-2 text-[11px] font-light leading-relaxed text-foreground/70">
               6 km survey square on the site's own relief —{" "}
               {terrainFor(maquette.id, maquette.latitude).relief} m of it. Rotors take the
