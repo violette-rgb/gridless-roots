@@ -112,6 +112,36 @@ export function bestLolp(site: Site) {
   return Math.min(...site.scenarios.map((s) => s.meilleur_lolp_atteignable));
 }
 
+/** Headline metric: best achievable LOLP at the most demanding IT load (50 MW). */
+export function headlineLolp(site: Site) {
+  const heaviest = site.scenarios.reduce((a, b) => (b.p_it_mw > a.p_it_mw ? b : a));
+  return heaviest.meilleur_lolp_atteignable;
+}
+
+export const CAPEX_TURBINE_MEUR = 8;
+export const CAPEX_PV_MEUR_PER_MW = 0.7;
+export const CAPEX_BATT_MEUR_PER_MWH = 0.25;
+
+export function sizingCapex(s: { turbines: number; pv_mw: number; batt_mwh: number }) {
+  return (
+    s.turbines * CAPEX_TURBINE_MEUR +
+    s.pv_mw * CAPEX_PV_MEUR_PER_MW +
+    s.batt_mwh * CAPEX_BATT_MEUR_PER_MWH
+  );
+}
+
+/** Cheapest CAPEX (M€) that reaches the band at the heaviest IT load, null if unreachable. */
+export function capexForBand(site: Site, band = "1%") {
+  const heaviest = site.scenarios.reduce((a, b) => (b.p_it_mw > a.p_it_mw ? b : a));
+  const sizing = heaviest.dimensionnement_optimal[band];
+  return sizing ? sizingCapex(sizing) : null;
+}
+
+export function formatCapex(capex: number | null) {
+  return capex === null ? "—" : `€${Math.round(capex).toLocaleString("en-US")} M`;
+}
+
+
 export async function loadDataset(): Promise<Dataset> {
   const res = await fetch("/data.json");
   if (!res.ok) throw new Error("Unable to load dataset");
