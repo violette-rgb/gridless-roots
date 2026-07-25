@@ -64,9 +64,11 @@ export function SiteFooter() {
             items={[
               { to: "/sites", label: "Site explorer" },
               { to: "/instrument", label: "Sizing instrument" },
+              { to: "/guide", label: "How to read it" },
               { to: "/method", label: "Physics model" },
             ]}
           />
+
           <FooterCol
             title="Project"
             items={[
