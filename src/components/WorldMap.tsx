@@ -210,7 +210,6 @@ function SurveyPlan({ site }: { site: Site | null }) {
 function MarkerLayer({
   sites,
   axes,
-  view,
   hoveredId,
   selectedId,
   approachedId,
