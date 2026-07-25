@@ -125,27 +125,39 @@ export function WorldMap({
           source: "graticule",
           paint: { "line-color": "#7fd6f2", "line-opacity": 0.07, "line-width": 0.5 },
         });
-        // Lift the basemap out of near-black so the landmasses read clearly.
-        for (const layer of m.getStyle().layers ?? []) {
-          const id = layer.id;
+        // In dark-matter the background IS the land, and water is painted over
+        // it. Push them apart so continents read clearly on the globe.
+        const paint = (id: string, prop: string, value: string | number) => {
           try {
-            if (layer.type === "background") {
-              m.setPaintProperty(id, "background-color", "#0e1620");
-            } else if (layer.type === "fill" && /water|ocean|sea|river/i.test(id)) {
-              m.setPaintProperty(id, "fill-color", "#0b1a27");
-            } else if (layer.type === "fill" && /earth|land|park|wood|sand|glacier/i.test(id)) {
-              m.setPaintProperty(id, "fill-color", "#26323d");
-            } else if (layer.type === "line" && /boundary|admin/i.test(id)) {
-              m.setPaintProperty(id, "line-color", "#7fd6f2");
-              m.setPaintProperty(id, "line-opacity", 0.35);
-            } else if (layer.type === "symbol") {
-              m.setPaintProperty(id, "text-color", "#cfe1ec");
-              m.setPaintProperty(id, "text-halo-color", "#0a1119");
-            }
+            if (m.getLayer(id)) m.setPaintProperty(id, prop, value);
           } catch {
             /* layer does not support this paint property */
           }
+        };
+        paint("background", "background-color", "#334455");
+        paint("landcover", "fill-color", "#3b4d5c");
+        paint("landcover", "fill-opacity", 0.6);
+        paint("park_national_park", "fill-opacity", 0.15);
+        paint("park_nature_reserve", "fill-opacity", 0.15);
+        paint("landuse", "fill-opacity", 0.12);
+        paint("landuse_residential", "fill-opacity", 0.12);
+        paint("water", "fill-color", "#0a1a26");
+        paint("water_shadow", "fill-color", "#08151f");
+        paint("waterway", "line-color", "#123244");
+        for (const layer of m.getStyle().layers ?? []) {
+          const id = layer.id;
+          if (layer.type === "line" && /boundary/i.test(id)) {
+            paint(id, "line-color", "#dff2fb");
+            paint(id, "line-opacity", 0.5);
+          } else if (layer.type === "symbol") {
+            paint(id, "text-color", "#f2f8fc");
+            paint(id, "text-halo-color", "#101d27");
+            paint(id, "text-halo-width", 1.4);
+          } else if (layer.type === "line" && /road|bridge|tunnel|rail|aeroway/i.test(id)) {
+            paint(id, "line-opacity", 0.18);
+          }
         }
+
         setReady(true);
         setCenter(m.getCenter().toArray() as [number, number]);
         project(m);
