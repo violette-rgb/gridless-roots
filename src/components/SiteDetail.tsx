@@ -168,3 +168,12 @@ export function SiteDetail({
     </motion.aside>
   );
 }
+
+function Spec({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-background/40 px-4 py-4">
+      <div className="label-xs">{label}</div>
+      <div className="num mt-1.5 text-sm font-light">{value}</div>
+    </div>
+  );
+}
