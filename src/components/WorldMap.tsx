@@ -5,7 +5,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import {
   referenceLolp,
   type GrilleAxes,
-  classify,
+  siteVerdict,
   formatLolp,
   VERDICT_COLOR,
   type Site,
@@ -224,7 +224,7 @@ export function WorldMap({
           if (angularDistance(center, [site.longitude, site.latitude]) > 78) return null;
 
           const lolp = referenceLolp(axes, site);
-          const color = VERDICT_COLOR[classify(lolp)];
+          const color = VERDICT_COLOR[siteVerdict(site)];
           const isHovered = hoveredId === site.id;
           const isSelected = selectedId === site.id;
           const dimmed = (hoveredId && !isHovered) || (panelOpen && !isSelected);

@@ -5,7 +5,7 @@ import { SiteFooter } from "@/components/SiteNav";
 import { HeroGlobe } from "@/components/HeroGlobe";
 import {
   capexForBand,
-  classify,
+  siteVerdict,
   formatCapex,
   formatLolp,
   referenceLolp,
@@ -174,7 +174,7 @@ function Landing() {
             .sort((a, b) => referenceLolp(data!.grille_axes, a) - referenceLolp(data!.grille_axes, b))
             .map((s) => {
               const lolp = referenceLolp(data!.grille_axes, s);
-              const color = VERDICT_COLOR[classify(lolp)];
+              const color = VERDICT_COLOR[siteVerdict(s)];
               return (
                 <li key={s.id}>
                   <Link

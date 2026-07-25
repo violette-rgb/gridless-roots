@@ -5,7 +5,7 @@ import { useState } from "react";
 import { WorldMap } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
 import {
-  classify,
+  siteVerdict,
   formatLolp,
   referenceLolp,
   loadDataset,
@@ -94,7 +94,7 @@ function SitesPage() {
             .sort((a, b) => referenceLolp(data.grille_axes, a) - referenceLolp(data.grille_axes, b))
             .map((s) => {
               const lolp = referenceLolp(data!.grille_axes, s);
-              const color = VERDICT_COLOR[classify(lolp)];
+              const color = VERDICT_COLOR[siteVerdict(s)];
               const active = hovered === s.id;
               return (
                 <li key={s.id}>

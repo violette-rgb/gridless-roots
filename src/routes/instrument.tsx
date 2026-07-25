@@ -5,7 +5,7 @@ import { SiteDetail } from "@/components/SiteDetail";
 import { SiteFooter } from "@/components/SiteNav";
 import {
   capexForBand,
-  classify,
+  siteVerdict,
   formatCapex,
   formatLolp,
   referenceLolp,
@@ -99,7 +99,7 @@ function InstrumentPage() {
                 .sort((a, b) => referenceLolp(data!.grille_axes, a) - referenceLolp(data!.grille_axes, b))
                 .map((site) => {
                   const lolp = referenceLolp(data!.grille_axes, site);
-                  const color = VERDICT_COLOR[classify(lolp)];
+                  const color = VERDICT_COLOR[siteVerdict(site)];
                   const active = selected?.id === site.id;
 
                   return (

@@ -174,3 +174,15 @@ export function referenceLolp(axes: GrilleAxes, site: Site) {
   );
   return heaviest.grille.lolp[idx];
 }
+
+/**
+ * Verdict for a site as a whole: can any simulated build hold 1 % outage at the
+ * heaviest load (viable), only 5–10 % (marginal), or nothing at all (failure)?
+ */
+export function siteVerdict(site: Site): Verdict {
+  const heaviest = site.scenarios.reduce((a, b) => (b.p_it_mw > a.p_it_mw ? b : a));
+  const bands = heaviest.dimensionnement_optimal ?? {};
+  if (bands["0.1%"] || bands["1%"]) return "viable";
+  if (bands["5%"] || bands["10%"]) return "marginal";
+  return "failure";
+}
