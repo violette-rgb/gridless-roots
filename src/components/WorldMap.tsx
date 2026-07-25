@@ -17,6 +17,8 @@ const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.j
 const INITIAL_CENTER: [number, number] = [10, 40];
 const INITIAL_ZOOM = 1.55;
 
+export type ZoomStage = "globe" | "country" | "city" | "site";
+
 
 type LineFeature = {
   type: "Feature";
@@ -71,6 +73,8 @@ interface Props {
   onApproach?: (id: string | null) => void;
   /** Site whose maquette is on screen — its map tooltip is suppressed. */
   approachedId?: string | null;
+  /** Reports the active descent scale: globe → country → city → site. */
+  onZoomStageChange?: (stage: ZoomStage, siteId: string | null) => void;
 }
 
 export function WorldMap({
@@ -83,15 +87,25 @@ export function WorldMap({
   panelOpen,
   onApproach,
   approachedId,
+  onZoomStageChange,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
+  const descentRef = useRef(0);
   const [ready, setReady] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
   const [mapEpoch, setMapEpoch] = useState(0);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [center, setCenter] = useState<[number, number]>(INITIAL_CENTER);
+  const [zoomStage, setZoomStage] = useState<ZoomStage>("globe");
 
+  const updateStage = useCallback(
+    (stage: ZoomStage, siteId: string | null) => {
+      setZoomStage(stage);
+      onZoomStageChange?.(stage, siteId);
+    },
+    [onZoomStageChange],
+  );
 
   const project = useCallback(
     (map: MLMap) => {
@@ -156,8 +170,43 @@ export function WorldMap({
           id: "graticule",
           type: "line",
           source: "graticule",
-          paint: { "line-color": "#7fd6f2", "line-opacity": 0.07, "line-width": 0.5 },
+          paint: { "line-color": "#7fd6f2", "line-opacity": 0.13, "line-width": 0.55 },
         });
+        try {
+          // Free MapLibre demo terrain tiles: enough relief signal for the city/site descent,
+          // no key and no dependency on the basemap provider.
+          if (!m.getSource("terrain-dem")) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (m as any).addSource("terrain-dem", {
+              type: "raster-dem",
+              tiles: ["https://demotiles.maplibre.org/terrain-tiles/{z}/{x}/{y}.png"],
+              tileSize: 256,
+              maxzoom: 12,
+              encoding: "terrarium",
+            });
+          }
+          const firstSymbol = m.getStyle().layers?.find((layer) => layer.type === "symbol")?.id;
+          if (!m.getLayer("terrain-hillshade")) {
+            m.addLayer(
+              {
+                id: "terrain-hillshade",
+                type: "hillshade",
+                source: "terrain-dem",
+                paint: {
+                  "hillshade-shadow-color": "#07111b",
+                  "hillshade-highlight-color": "#9ec6dc",
+                  "hillshade-accent-color": "#25485d",
+                  "hillshade-exaggeration": 0.42,
+                },
+              },
+              firstSymbol,
+            );
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (m as any).setTerrain?.({ source: "terrain-dem", exaggeration: 0.75 });
+        } catch (e) {
+          console.warn("[maplibre] terrain overlay unavailable", e);
+        }
         // In dark-matter the background IS the land, and water is painted over
         // it. Push them apart so continents read clearly on the globe.
         const paint = (id: string, prop: string, value: string | number) => {
@@ -168,13 +217,13 @@ export function WorldMap({
             /* layer does not support this paint property */
           }
         };
-        paint("background", "background-color", "#334455");
-        paint("landcover", "fill-color", "#3b4d5c");
-        paint("landcover", "fill-opacity", 0.6);
-        paint("park_national_park", "fill-opacity", 0.15);
-        paint("park_nature_reserve", "fill-opacity", 0.15);
-        paint("landuse", "fill-opacity", 0.12);
-        paint("landuse_residential", "fill-opacity", 0.12);
+        paint("background", "background-color", "#405463");
+        paint("landcover", "fill-color", "#526a7a");
+        paint("landcover", "fill-opacity", 0.72);
+        paint("park_national_park", "fill-opacity", 0.24);
+        paint("park_nature_reserve", "fill-opacity", 0.24);
+        paint("landuse", "fill-opacity", 0.2);
+        paint("landuse_residential", "fill-opacity", 0.2);
         paint("water", "fill-color", "#0a1a26");
         paint("water_shadow", "fill-color", "#08151f");
         paint("waterway", "line-color", "#123244");
@@ -182,13 +231,13 @@ export function WorldMap({
           const id = layer.id;
           if (layer.type === "line" && /boundary/i.test(id)) {
             paint(id, "line-color", "#dff2fb");
-            paint(id, "line-opacity", 0.5);
+            paint(id, "line-opacity", 0.72);
           } else if (layer.type === "symbol") {
             paint(id, "text-color", "#f2f8fc");
             paint(id, "text-halo-color", "#101d27");
             paint(id, "text-halo-width", 1.4);
           } else if (layer.type === "line" && /road|bridge|tunnel|rail|aeroway/i.test(id)) {
-            paint(id, "line-opacity", 0.18);
+            paint(id, "line-opacity", 0.28);
           }
         }
 
@@ -218,8 +267,10 @@ export function WorldMap({
   const resetToGlobe = useCallback(() => {
     onHover(null);
     onApproach?.(null);
+    updateStage("globe", null);
     const map = mapRef.current;
     if (!map || !ready) return;
+    map.stop();
     map.easeTo({
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
@@ -227,21 +278,24 @@ export function WorldMap({
       bearing: 0,
       duration: 1200,
     });
-  }, [onApproach, onHover, ready]);
+  }, [onApproach, onHover, ready, updateStage]);
 
   const reloadMap = useCallback(() => {
     onHover(null);
     onApproach?.(null);
+    updateStage("globe", null);
     setMapEpoch((n) => n + 1);
-  }, [onApproach, onHover]);
+  }, [onApproach, onHover, updateStage]);
 
   // Hover: cinematic descent — globe → country → city → site scale.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || selectedId) return;
     const site = sites.find((s) => s.id === hoveredId);
+    const descent = ++descentRef.current;
     if (!site) {
       onApproach?.(null);
+      updateStage("globe", null);
       const t = setTimeout(
         () =>
           mapRef.current?.easeTo({
@@ -256,22 +310,62 @@ export function WorldMap({
       return () => clearTimeout(t);
     }
     const target: [number, number] = [site.longitude, site.latitude];
-    // 1 — swing the globe over the country
-    map.easeTo({ center: target, zoom: 4.2, pitch: 0, bearing: 0, duration: 850 });
-    // 2 — city scale, camera tilts
+    const padding = {
+      left: Math.min(340, Math.round(window.innerWidth * 0.28)),
+      right: Math.min(90, Math.round(window.innerWidth * 0.06)),
+      top: 90,
+      bottom: 110,
+    };
+    map.stop();
+    onApproach?.(null);
+    updateStage("country", site.id);
+    // 1 — country scale: keep a readable national outline before descending.
+    map.flyTo({
+      center: target,
+      zoom: 3.45,
+      pitch: 0,
+      bearing: 0,
+      duration: 1150,
+      curve: 1.65,
+      padding,
+      essential: true,
+    });
+    // 2 — city scale: labels/roads/terrain become legible.
     const t2 = setTimeout(() => {
-      mapRef.current?.easeTo({ center: target, zoom: 7.6, pitch: 40, bearing: -12, duration: 950 });
-    }, 900);
-    // 3 — site scale, hand over to the physical maquette
+      if (descentRef.current !== descent) return;
+      updateStage("city", site.id);
+      mapRef.current?.flyTo({
+        center: target,
+        zoom: 7.15,
+        pitch: 38,
+        bearing: -12,
+        duration: 1350,
+        curve: 1.25,
+        padding,
+        essential: true,
+      });
+    }, 1250);
+    // 3 — site scale: hand over to the physical topographic maquette.
     const t3 = setTimeout(() => {
-      mapRef.current?.easeTo({ center: target, zoom: 11.2, pitch: 62, bearing: -24, duration: 1200 });
+      if (descentRef.current !== descent) return;
+      updateStage("site", site.id);
+      mapRef.current?.flyTo({
+        center: target,
+        zoom: 11.35,
+        pitch: 64,
+        bearing: -24,
+        duration: 1600,
+        curve: 1.05,
+        padding,
+        essential: true,
+      });
       onApproach?.(site.id);
-    }, 1950);
+    }, 2750);
     return () => {
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [hoveredId, selectedId, ready, sites, onApproach]);
+  }, [hoveredId, selectedId, ready, sites, onApproach, updateStage]);
 
   // Fly to selection
   useEffect(() => {
@@ -279,6 +373,9 @@ export function WorldMap({
     if (!map || !ready) return;
     const site = sites.find((s) => s.id === selectedId);
     if (!site) return;
+    updateStage("site", site.id);
+    onApproach?.(null);
+    map.stop();
     map.flyTo({
       center: [site.longitude, site.latitude],
       zoom: 10.5,
@@ -290,11 +387,11 @@ export function WorldMap({
       essential: true,
       padding: { right: Math.round(window.innerWidth * 0.55), left: 0, top: 0, bottom: 0 },
     });
-  }, [selectedId, ready, sites]);
+  }, [selectedId, ready, sites, onApproach, updateStage]);
 
 
   return (
-    <div className="absolute inset-0 bg-page">
+    <div className="absolute inset-0 bg-page" data-map-stage={zoomStage}>
       <FallbackGlobe active={!ready || mapFailed} />
       <div
         ref={container}
