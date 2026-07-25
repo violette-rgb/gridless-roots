@@ -140,7 +140,7 @@ export function WorldMap({
       resizeObserver = new ResizeObserver(() => m.resize());
       resizeObserver.observe(container.current);
       loadTimer = window.setTimeout(() => {
-        if (!cancelled && !ready) setMapFailed(true);
+        if (!cancelled && !m.loaded()) setMapFailed(true);
       }, 7000);
       m.on("error", (e) => console.error("[maplibre]", e?.error ?? e));
       m.on("load", () => {
