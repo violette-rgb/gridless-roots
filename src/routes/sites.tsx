@@ -100,12 +100,15 @@ function SitesPage() {
           >
             Globe overview
           </Button>
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={() => data?.sites[0] && setSelected(data.sites[0])}
-            className="rounded-full border border-primary/40 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors duration-200 hover:bg-primary/10"
+            className="rounded-full border-primary/40 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary hover:bg-primary/10"
           >
             Open instrument
-          </button>
+          </Button>
           <Link
             to="/guide"
             className="rounded-full border border-hairline px-4 py-2 text-[11px] uppercase tracking-[0.16em] opacity-75 transition-opacity hover:opacity-100"
@@ -123,14 +126,16 @@ function SitesPage() {
               const active = hovered === s.id;
               return (
                 <li key={s.id}>
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
                     onMouseEnter={() => setHovered(s.id)}
                     onFocus={() => setHovered(s.id)}
                     onClick={() => {
                       setHovered(s.id);
                       setSelected(s);
                     }}
-                    className={`group flex w-full items-baseline justify-between border-b border-hairline py-2.5 text-left transition-opacity duration-200 ${
+                    className={`group flex h-auto w-full items-baseline justify-between rounded-none border-b border-hairline px-0 py-2.5 text-left font-normal hover:bg-transparent ${
                       active ? "opacity-100" : "opacity-75 hover:opacity-95"
                     }`}
                   >
@@ -148,7 +153,7 @@ function SitesPage() {
                     <span className="num text-[12px]" style={{ color }}>
                       {formatLolp(lolp)}%
                     </span>
-                  </button>
+                  </Button>
                 </li>
               );
             })}
