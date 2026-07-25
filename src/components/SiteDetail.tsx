@@ -14,10 +14,12 @@ export function SiteDetail({
   site,
   data,
   onClose,
+  embedded = false,
 }: {
   site: Site;
   data: Dataset;
-  onClose: () => void;
+  onClose?: () => void;
+  embedded?: boolean;
 }) {
   const axes = data.grille_axes;
   const [tab, setTab] = useState(0);
@@ -42,6 +44,7 @@ export function SiteDetail({
   }, [scenario]);
 
   useEffect(() => {
+    if (!onClose) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -53,7 +56,11 @@ export function SiteDetail({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 12 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className="panel pointer-events-auto absolute right-4 top-24 bottom-6 z-40 flex w-[min(64vw,900px)] flex-col overflow-hidden max-lg:left-4 max-lg:w-auto"
+      className={`panel pointer-events-auto z-40 flex flex-col overflow-hidden ${
+        embedded
+          ? "relative h-[calc(100vh-8rem)] w-full"
+          : "absolute right-4 top-24 bottom-6 w-[min(64vw,900px)] max-lg:left-4 max-lg:w-auto"
+      }`}
     >
       <motion.header
         initial="hidden"
@@ -67,12 +74,14 @@ export function SiteDetail({
           </div>
           <h2 className="mt-1 text-3xl font-extralight tracking-tight">{site.nom}</h2>
         </div>
-        <button
-          onClick={onClose}
-          className="label-xs rounded-full border border-hairline px-3 py-1.5 transition-colors duration-200 hover:border-primary/40 hover:opacity-90"
-        >
-          Close
-        </button>
+        {onClose && !embedded && (
+          <button
+            onClick={onClose}
+            className="label-xs rounded-full border border-hairline px-3 py-1.5 transition-colors duration-200 hover:border-primary/40 hover:opacity-90"
+          >
+            Close
+          </button>
+        )}
       </motion.header>
 
       <nav className="flex gap-7 border-b border-hairline px-8">
