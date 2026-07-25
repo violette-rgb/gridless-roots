@@ -243,7 +243,7 @@ function SiteTerrainPlan({ site, reveal }: { site: Site; reveal: number }) {
         const t = i / (rug > 0.7 ? 6 : 8);
         return {
           x: -132 + t * 264,
-          y: -104 + Math.sin(seed * 0.013 + t * 3.1) * 20 * (0.4 + rug),
+          y: -62 + Math.sin(seed * 0.013 + t * 3.1) * 20 * (0.4 + rug),
         };
       }),
     [seed, rug],
