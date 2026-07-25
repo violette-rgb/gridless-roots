@@ -54,7 +54,7 @@ const CX = 520;
 const CY = 500;
 const HOME_R = 286;
 const HOME_VIEW: ViewState = { lon: HOME[0], lat: HOME[1], progress: 0 };
-const SITE_SCALE = 4.25;
+const SITE_SCALE = 3.1;
 
 function projectPoint(lon: number, lat: number, view: ViewState): ProjectedPoint {
   const radius = HOME_R;
@@ -414,7 +414,7 @@ export function WorldMap(props: Props) {
   const mapX = focusPoint ? CX - focusPoint.x * scale : 0;
   const mapY = focusPoint ? CY - focusPoint.y * scale : 0;
   const mapTransform = useSmoothTransform({ x: mapX, y: mapY, scale });
-  const reveal = Math.max(0, Math.min(1, (mapTransform.scale - 2.1) / (SITE_SCALE - 2.6)));
+  const reveal = Math.max(0, Math.min(1, (mapTransform.scale - 1.6) / (SITE_SCALE - 2.1)));
 
   useEffect(() => {
     if (!focus) {
