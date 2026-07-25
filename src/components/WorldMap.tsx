@@ -541,3 +541,11 @@ export function WorldMap(props: Props) {
     </div>
   );
 }
+function Readout({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="label-xs">{label}</dt>
+      <dd className="num text-[12px] text-foreground/85">{value}</dd>
+    </div>
+  );
+}
