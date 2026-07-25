@@ -10,51 +10,8 @@ import {
   type Site,
 } from "@/lib/offgrid-data";
 
-const STYLE = {
-  version: 8 as const,
-  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-  sources: {
-    carto: {
-      type: "raster" as const,
-      tiles: [
-        "https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2x.png",
-        "https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2x.png",
-        "https://c.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2x.png",
-      ],
-      tileSize: 256,
-      attribution: "© OpenStreetMap · © CARTO · Terrain: Mapzen / AWS",
-    },
-    terrain: {
-      type: "raster-dem" as const,
-      tiles: [
-        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
-      ],
-      encoding: "terrarium" as const,
-      tileSize: 256,
-      maxzoom: 13,
-    },
-  },
-  layers: [
-    { id: "bg", type: "background" as const, paint: { "background-color": "#07090c" } },
-    {
-      id: "base",
-      type: "raster" as const,
-      source: "carto",
-      paint: { "raster-opacity": 0.85, "raster-saturation": -0.5, "raster-contrast": 0.1 },
-    },
-    {
-      id: "hillshade",
-      type: "hillshade" as const,
-      source: "terrain",
-      paint: {
-        "hillshade-exaggeration": 0.45,
-        "hillshade-shadow-color": "#02040a",
-        "hillshade-highlight-color": "#3d6f88",
-        "hillshade-accent-color": "#0b1b26",
-      },
-    },
-  ],
-};
+const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+
 
 type LineFeature = {
   type: "Feature";
@@ -129,16 +86,18 @@ export function WorldMap({
       if (cancelled || !container.current) return;
       map = new maplibregl.Map({
         container: container.current,
-        style: STYLE as never,
-        center: [4, 52],
-        zoom: 2.9,
+        style: STYLE_URL,
+        center: [10, 55],
+        zoom: 3.2,
         pitch: 0,
         attributionControl: { compact: true },
         maxPitch: 75,
       });
       mapRef.current = map;
       const m = map;
+      m.on("error", (e) => console.error("[maplibre]", e?.error ?? e));
       m.on("load", () => {
+        m.resize();
         m.addSource("graticule", { type: "geojson", data: graticule() });
         m.addLayer({
           id: "graticule",
@@ -146,12 +105,12 @@ export function WorldMap({
           source: "graticule",
           paint: { "line-color": "#7fd6f2", "line-opacity": 0.07, "line-width": 0.5 },
         });
-        m.setTerrain({ source: "terrain", exaggeration: 1.25 });
         setReady(true);
         project(m);
       });
       m.on("move", () => project(m));
       m.on("render", () => project(m));
+      requestAnimationFrame(() => m.resize());
     })();
     return () => {
       cancelled = true;
@@ -166,7 +125,7 @@ export function WorldMap({
     if (!map || !ready) return;
     const site = sites.find((s) => s.id === selectedId);
     if (!site) {
-      map.easeTo({ center: [4, 52], zoom: 2.9, pitch: 0, bearing: 0, duration: 1600, padding: { left: 0, right: 0 } });
+      map.easeTo({ center: [10, 55], zoom: 3.2, pitch: 0, bearing: 0, duration: 1600, padding: { left: 0, right: 0 } });
       return;
     }
     map.flyTo({
@@ -184,7 +143,7 @@ export function WorldMap({
 
   return (
     <div className="absolute inset-0">
-      <div ref={container} className="absolute inset-0" />
+      <div ref={container} className="absolute inset-0 h-full w-full" />
       <div className="vignette pointer-events-none absolute inset-0" />
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
