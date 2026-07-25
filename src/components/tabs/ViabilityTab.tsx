@@ -154,6 +154,163 @@ export function ViabilityTab({
           </div>
         </button>
       )}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Sweep
+          title="Sensitivity · battery"
+          note={`${turbines} turbines · ${pv} MWp fixed`}
+          unit="MWh"
+          data={axes.batt_mwh.map((v) => ({
+            x: v,
+            y:
+              (scenario.grille.lolp[
+                gridIndex(
+                  axes,
+                  axes.turbines.indexOf(turbines),
+                  axes.pv_mw.indexOf(pv),
+                  axes.batt_mwh.indexOf(v),
+                )
+              ] ?? 0) * 100,
+          }))}
+          current={batt}
+        />
+        <Sweep
+          title="Sensitivity · turbines"
+          note={`${pv} MWp · ${batt.toLocaleString("en-US")} MWh fixed`}
+          unit=""
+          data={axes.turbines.map((v) => ({
+            x: v,
+            y:
+              (scenario.grille.lolp[
+                gridIndex(
+                  axes,
+                  axes.turbines.indexOf(v),
+                  axes.pv_mw.indexOf(pv),
+                  axes.batt_mwh.indexOf(batt),
+                )
+              ] ?? 0) * 100,
+          }))}
+          current={turbines}
+        />
+      </div>
+
+      <div>
+        <div className="flex items-baseline justify-between">
+          <span className="label-xs">Cost of reliability · cheapest CAPEX per LOLP band</span>
+          <span className="label-xs">{pIt} MW IT</span>
+        </div>
+        <div className="mt-3 grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline sm:grid-cols-4">
+          {frontier(axes, scenario).map((f) => (
+            <div key={f.label} className="bg-background/40 px-4 py-4">
+              <div className="label-xs" style={{ color: f.color }}>
+                {f.label}
+              </div>
+              <div className="num mt-1.5 text-lg font-light">
+                {f.capex === null ? "—" : `€${f.capex.toFixed(0)} M`}
+              </div>
+              <div className="num mt-1 text-[11px] font-light opacity-40">
+                {f.sizing ?? "unreachable"}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function frontier(axes: GrilleAxes, scenario: Scenario) {
+  const bands = [
+    { label: "≤ 0.1 %", max: 0.001, color: VERDICT_COLOR.viable },
+    { label: "≤ 1 %", max: 0.01, color: VERDICT_COLOR.viable },
+    { label: "≤ 5 %", max: 0.05, color: VERDICT_COLOR.marginal },
+    { label: "≤ 10 %", max: 0.1, color: VERDICT_COLOR.marginal },
+  ];
+  return bands.map((b) => {
+    let best: { capex: number; sizing: string } | null = null;
+    axes.turbines.forEach((t, it) =>
+      axes.pv_mw.forEach((p, ip) =>
+        axes.batt_mwh.forEach((bt, ib) => {
+          const i = gridIndex(axes, it, ip, ib);
+          const l = scenario.grille.lolp[i];
+          const c = scenario.grille.capex_meur[i];
+          if (l === undefined || c === undefined || l > b.max) return;
+          if (!best || c < best.capex)
+            best = { capex: c, sizing: `${t} T · ${p} MWp · ${bt.toLocaleString("en-US")} MWh` };
+        }),
+      ),
+    );
+    const hit = best as { capex: number; sizing: string } | null;
+    return { ...b, capex: hit?.capex ?? null, sizing: hit?.sizing ?? null };
+  });
+}
+
+function Sweep({
+  title,
+  note,
+  unit,
+  data,
+  current,
+}: {
+  title: string;
+  note: string;
+  unit: string;
+  data: { x: number; y: number }[];
+  current: number;
+}) {
+  const max = Math.max(...data.map((d) => d.y), 0.5);
+  const w = 100;
+  const h = 46;
+  const xs = (i: number) => (i / Math.max(1, data.length - 1)) * w;
+  const ys = (v: number) => h - (v / max) * h;
+  const path = data.map((d, i) => `${i === 0 ? "M" : "L"}${xs(i)},${ys(d.y)}`).join(" ");
+  const ci = data.findIndex((d) => d.x === current);
+
+  return (
+    <div className="rounded-xl border border-hairline px-5 py-4">
+      <div>
+        <div className="label-xs">{title}</div>
+        <div className="label-xs mt-1 opacity-40">{note}</div>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="mt-4 h-24 w-full">
+        <path
+          d={`${path} L${w},${h} L0,${h} Z`}
+          fill="currentColor"
+          className="text-primary/10"
+        />
+        <path
+          d={path}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={0.7}
+          vectorEffect="non-scaling-stroke"
+          className="text-primary"
+        />
+        {ci >= 0 && (
+          <line
+            x1={xs(ci)}
+            x2={xs(ci)}
+            y1={0}
+            y2={h}
+            stroke="currentColor"
+            strokeWidth={0.5}
+            strokeDasharray="2 2"
+            vectorEffect="non-scaling-stroke"
+            className="text-foreground/40"
+          />
+        )}
+      </svg>
+      <div className="num mt-2 flex justify-between text-[11px] font-light opacity-40">
+        <span>
+          {data[0].x} {unit}
+        </span>
+        <span>
+          0 – {max.toFixed(max < 2 ? 2 : 0)} % LOLP
+        </span>
+        <span>
+          {data[data.length - 1].x.toLocaleString("en-US")} {unit}
+        </span>
+      </div>
     </div>
   );
 }
