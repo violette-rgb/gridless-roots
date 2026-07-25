@@ -219,15 +219,17 @@ function SitesPage() {
                 {terrainFor(maquette.id, maquette.latitude).landform.replace("-", " ")}
               </div>
             </div>
-            <SiteConcept
-              siteId={maquette.id}
-              latitude={maquette.latitude}
-              turbines={50}
-              pv={100}
-              batt={800}
-              pIt={50}
-              heightClass="h-[240px]"
-            />
+            <div className="h-[240px] overflow-hidden rounded-xl border border-hairline bg-background/80">
+              <SiteConcept
+                siteId={maquette.id}
+                latitude={maquette.latitude}
+                turbines={50}
+                pv={100}
+                batt={800}
+                pIt={50}
+                heightClass="h-full"
+              />
+            </div>
             <p className="px-1 pt-2 text-[11px] font-light leading-relaxed text-foreground/70">
               6 km survey square on the site's own relief —{" "}
               {terrainFor(maquette.id, maquette.latitude).relief} m of it. Rotors take the
