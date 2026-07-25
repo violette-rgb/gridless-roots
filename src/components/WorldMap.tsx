@@ -86,16 +86,18 @@ export function WorldMap({
       if (cancelled || !container.current) return;
       map = new maplibregl.Map({
         container: container.current,
-        style: STYLE as never,
-        center: [4, 52],
-        zoom: 2.9,
+        style: STYLE_URL,
+        center: [10, 55],
+        zoom: 3.2,
         pitch: 0,
         attributionControl: { compact: true },
         maxPitch: 75,
       });
       mapRef.current = map;
       const m = map;
+      m.on("error", (e) => console.error("[maplibre]", e?.error ?? e));
       m.on("load", () => {
+        m.resize();
         m.addSource("graticule", { type: "geojson", data: graticule() });
         m.addLayer({
           id: "graticule",
@@ -103,12 +105,12 @@ export function WorldMap({
           source: "graticule",
           paint: { "line-color": "#7fd6f2", "line-opacity": 0.07, "line-width": 0.5 },
         });
-        m.setTerrain({ source: "terrain", exaggeration: 1.25 });
         setReady(true);
         project(m);
       });
       m.on("move", () => project(m));
       m.on("render", () => project(m));
+      requestAnimationFrame(() => m.resize());
     })();
     return () => {
       cancelled = true;
