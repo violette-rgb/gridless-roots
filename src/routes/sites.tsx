@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
+import { terrainFor } from "@/lib/terrain";
+
+const SiteConcept = lazy(() => import("@/components/tabs/SiteConcept"));
 import { WorldMap } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
 import {
@@ -47,6 +50,12 @@ function SitesPage() {
   });
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<Site | null>(null);
+  const [approached, setApproached] = useState<string | null>(null);
+  const onApproach = useCallback((id: string | null) => setApproached(id), []);
+  const maquette =
+    !selected && approached && approached === hovered
+      ? (data?.sites.find((s) => s.id === approached) ?? null)
+      : null;
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-page">
@@ -59,6 +68,7 @@ function SitesPage() {
           onHover={setHovered}
           onSelect={setSelected}
           panelOpen={!!selected}
+          onApproach={onApproach}
         />
       )}
 
@@ -88,7 +98,7 @@ function SitesPage() {
             Guide
           </Link>
         </div>
-        <ul className="mt-5 max-h-[52vh] space-y-px overflow-y-auto pr-1">
+        <ul className="mt-5 max-h-[44vh] space-y-px overflow-y-auto pr-1">
           {data?.sites
             .slice()
             .sort((a, b) => referenceLolp(data.grille_axes, a) - referenceLolp(data.grille_axes, b))
@@ -135,6 +145,52 @@ function SitesPage() {
         <Key color="var(--marginal)" text="Marginal" />
         <Key color="var(--failure)" text="Not viable" />
       </div>
+
+      {/* Architectural maquette — appears once the camera has landed on the site */}
+      <AnimatePresence>
+        {maquette && (
+          <motion.div
+            key={maquette.id}
+            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.97 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="panel absolute bottom-24 right-6 z-40 w-[380px] overflow-hidden p-3 md:right-10 md:w-[440px]"
+          >
+            <div className="flex items-baseline justify-between px-1 pb-2">
+              <div className="label-xs">
+                {maquette.nom} · {maquette.pays} · site maquette
+              </div>
+              <div className="label-xs">
+                {terrainFor(maquette.id, maquette.latitude).landform.replace("-", " ")}
+              </div>
+            </div>
+            <Suspense
+              fallback={
+                <div className="label-xs flex h-[240px] items-center justify-center">
+                  Building terrain…
+                </div>
+              }
+            >
+              <SiteConcept
+                siteId={maquette.id}
+                latitude={maquette.latitude}
+                turbines={50}
+                pv={100}
+                batt={800}
+                pIt={50}
+                heightClass="h-[240px]"
+              />
+            </Suspense>
+            <p className="px-1 pt-2 text-[11px] font-light leading-relaxed text-foreground/70">
+              6 km survey square on the site's own relief —{" "}
+              {terrainFor(maquette.id, maquette.latitude).relief} m of it. Rotors take the
+              exposed ridges, panels the gentle south slopes, halls the graded pad. Click
+              the site to open the full instrument.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {selected && data && (
