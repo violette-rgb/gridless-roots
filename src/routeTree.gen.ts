@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitesRouteImport } from './routes/sites'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as MethodRouteImport } from './routes/method'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 
 const SitesRoute = SitesRouteImport.update({
@@ -29,6 +30,11 @@ const MethodRoute = MethodRouteImport.update({
   path: '/method',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,12 +43,14 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/method': typeof MethodRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sites': typeof SitesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/method': typeof MethodRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sites': typeof SitesRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/method': typeof MethodRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sites': typeof SitesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/method' | '/sitemap.xml' | '/sites'
+  fullPaths: '/' | '/about' | '/method' | '/sitemap.xml' | '/sites'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/method' | '/sitemap.xml' | '/sites'
-  id: '__root__' | '/' | '/method' | '/sitemap.xml' | '/sites'
+  to: '/' | '/about' | '/method' | '/sitemap.xml' | '/sites'
+  id: '__root__' | '/' | '/about' | '/method' | '/sitemap.xml' | '/sites'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
   MethodRoute: typeof MethodRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SitesRoute: typeof SitesRoute
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MethodRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
   MethodRoute: MethodRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SitesRoute: SitesRoute,
