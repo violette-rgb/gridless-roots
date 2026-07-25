@@ -12,7 +12,7 @@ function Turbine({ position, phase }: { position: [number, number, number]; phas
     <group position={position}>
       <mesh position={[0, 3, 0]}>
         <cylinderGeometry args={[0.06, 0.1, 6, 8]} />
-        <meshStandardMaterial color="#cfd6ee" emissive="#7fb6d8" emissiveIntensity={0.25} />
+        <meshStandardMaterial color="#cfd6ee" emissive="#7fb6d8" emissiveIntensity={0.6} />
       </mesh>
       <group ref={rotor} position={[0, 6, 0.15]} rotation={[0, 0, phase]}>
         {[0, 1, 2].map((i) => (
@@ -21,7 +21,7 @@ function Turbine({ position, phase }: { position: [number, number, number]; phas
             <meshStandardMaterial
               color="#e6ecff"
               emissive="#8fd8f2"
-              emissiveIntensity={0.35}
+              emissiveIntensity={0.8}
             />
           </mesh>
         ))}
@@ -37,8 +37,8 @@ function Hall({ position, size }: { position: [number, number, number]; size: [n
       <meshStandardMaterial
         color="#dcd8f2"
         emissive="#8f9ce0"
-        emissiveIntensity={0.35}
-        roughness={0.6}
+        emissiveIntensity={0.7}
+        roughness={0.5}
       />
     </mesh>
   );
@@ -76,9 +76,9 @@ function Scene({
 
   return (
     <>
-      <ambientLight intensity={0.45} />
-      <hemisphereLight args={["#8fd8f2", "#0a0e18", 0.6]} />
-      <pointLight position={[0, 18, 0]} intensity={60} color="#8fd8f2" distance={80} />
+      <ambientLight intensity={1.1} />
+      <hemisphereLight args={["#8fd8f2", "#0a0e18", 1.2]} />
+      <pointLight position={[0, 18, 0]} intensity={900} color="#8fd8f2" distance={140} />
 
       <group ref={rig}>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
@@ -108,7 +108,7 @@ function Scene({
               <meshStandardMaterial
                 color="#16324a"
                 emissive="#3ea6d8"
-                emissiveIntensity={0.28}
+                emissiveIntensity={0.55}
                 side={2}
               />
             </mesh>
@@ -129,7 +129,7 @@ function Scene({
             <meshStandardMaterial
               color="#c9d4ea"
               emissive="#6fb0d0"
-              emissiveIntensity={0.25}
+              emissiveIntensity={0.55}
             />
           </mesh>
         ))}
@@ -157,8 +157,8 @@ export default function SiteConcept(props: {
 }) {
   return (
     <div className="h-[420px] w-full overflow-hidden rounded-xl border border-hairline bg-[#05070b]">
-      <Canvas camera={{ position: [0, 22, 48], fov: 42 }} dpr={[1, 1.8]}>
-        <fog attach="fog" args={["#05070b", 60, 130]} />
+      <Canvas camera={{ position: [0, 20, 55], fov: 45 }} dpr={[1, 1.8]}>
+        <fog attach="fog" args={["#05070b", 120, 260]} />
         <Scene {...props} />
       </Canvas>
     </div>
