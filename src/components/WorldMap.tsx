@@ -5,9 +5,12 @@ import { Button } from "@/components/ui/button";
 import {
   type GrilleAxes,
   siteVerdict,
+  referenceLolp,
+  formatLolp,
   VERDICT_COLOR,
   type Site,
 } from "@/lib/offgrid-data";
+import { terrainFor } from "@/lib/terrain";
 
 export type ZoomStage = "globe" | "country" | "city" | "site";
 
@@ -51,7 +54,7 @@ const CX = 520;
 const CY = 500;
 const HOME_R = 286;
 const HOME_VIEW: ViewState = { lon: HOME[0], lat: HOME[1], progress: 0 };
-const SITE_SCALE = 4.25;
+const SITE_SCALE = 3.1;
 
 function projectPoint(lon: number, lat: number, view: ViewState): ProjectedPoint {
   const radius = HOME_R;
@@ -206,39 +209,137 @@ function CountryLayer({ countries }: { countries: CountryCollection | null }) {
   );
 }
 
-function SurveyPlan({ site }: { site: Site | null }) {
-  if (!site) return null;
+function seedNum(id: string) {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) % 100000;
+  return h;
+}
+
+/** Zoomed-in topographic site map, drawn in globe coordinates around the site. */
+function SiteTerrainPlan({ site, reveal }: { site: Site; reveal: number }) {
   const center = projectPoint(site.longitude, site.latitude, HOME_VIEW);
+  const terrain = terrainFor(site.id, site.latitude);
+  const seed = seedNum(site.id);
+  const rug = terrain.ruggedness;
+
+  const contours = useMemo(() => {
+    const rows: { d: string; index: number }[] = [];
+    for (let i = 0; i < 16; i += 1) {
+      const y = -132 + i * 17;
+      const a = Math.sin(seed * 0.017 + i * 0.7) * 16 * (0.5 + rug);
+      const b = Math.cos(seed * 0.031 + i * 0.53) * 13 * (0.5 + rug);
+      const c = Math.sin(seed * 0.011 + i * 0.9) * 10 * (0.4 + rug);
+      rows.push({
+        index: i,
+        d: `M-150 ${(y + a * 0.4).toFixed(1)} C-96 ${(y - a).toFixed(1)} -44 ${(y + b).toFixed(1)} 6 ${(y - c).toFixed(1)} C58 ${(y + b * 0.6).toFixed(1)} 106 ${(y - a * 0.7).toFixed(1)} 150 ${(y + c * 0.5).toFixed(1)}`,
+      });
+    }
+    return rows;
+  }, [seed, rug]);
+
+  const turbines = useMemo(
+    () =>
+      Array.from({ length: rug > 0.7 ? 7 : 9 }, (_, i) => {
+        const t = i / (rug > 0.7 ? 6 : 8);
+        return {
+          x: -132 + t * 264,
+          y: -62 + Math.sin(seed * 0.013 + t * 3.1) * 20 * (0.4 + rug),
+        };
+      }),
+    [seed, rug],
+  );
+
+  const panelRows = rug > 0.62 ? 3 : 5;
+
   return (
     <motion.g
-      transform={`translate(${center.x} ${center.y}) scale(0.82) rotate(-18)`}
+      transform={`translate(${center.x} ${center.y})`}
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      animate={{ opacity: reveal }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.45, ease: "easeOut" }}
+      transition={{ duration: 0.2, ease: "linear" }}
+      pointerEvents="none"
     >
-      <rect x="-58" y="-36" width="116" height="72" rx="4" fill="var(--foreground)" opacity="0.82" />
-      <rect x="-49" y="-25" width="98" height="18" rx="2" fill="var(--page)" opacity="0.78" />
-      <rect x="-49" y="4" width="98" height="18" rx="2" fill="var(--page)" opacity="0.78" />
-      {Array.from({ length: 18 }, (_, i) => {
-        const col = i % 6;
-        const row = Math.floor(i / 6);
-        return <rect key={i} x={-126 + col * 20} y={58 + row * 12} width="15" height="7" fill="var(--primary)" opacity="0.7" />;
-      })}
-      <path d="M-148 -76 C-92 -118 -42 -98 0 -126 C46 -156 94 -122 142 -148" fill="none" stroke="var(--primary)" strokeWidth="2" strokeDasharray="7 6" opacity="0.72" />
-      {[-138, -78, -14, 52, 118].map((x, index) => (
-        <g key={x} transform={`translate(${x} ${index % 2 ? -96 : -122})`}>
-          <line y1="0" y2="-28" stroke="var(--foreground)" strokeWidth="2" />
-          <circle cy="-34" r="8" fill="none" stroke="var(--foreground)" strokeWidth="2" />
-          <line x1="0" y1="-34" x2="0" y2="-47" stroke="var(--foreground)" strokeWidth="1.6" />
-          <line x1="0" y1="-34" x2="11" y2="-28" stroke="var(--foreground)" strokeWidth="1.6" />
-          <line x1="0" y1="-34" x2="-11" y2="-28" stroke="var(--foreground)" strokeWidth="1.6" />
+      {/* survey ground */}
+      <rect x="-152" y="-136" width="304" height="272" rx="3" fill="var(--muted)" opacity="0.5" />
+      {terrain.coastal && (
+        <path d="M-152 96 C-96 84 -42 112 10 100 C64 88 110 116 152 104 L152 136 L-152 136 Z" fill="var(--page)" opacity="0.9" />
+      )}
+      {contours.map(({ d, index }) => (
+        <path
+          key={index}
+          d={d}
+          fill="none"
+          stroke="var(--primary)"
+          strokeOpacity={index % 4 === 0 ? 0.5 : 0.22}
+          strokeWidth={index % 4 === 0 ? 0.9 : 0.5}
+        />
+      ))}
+
+      {/* access road */}
+      <path
+        d={`M-152 ${(40 + (seed % 17)).toFixed(0)} C-80 ${(20 + (seed % 11)).toFixed(0)} -30 60 8 44 C48 27 96 40 152 18`}
+        fill="none"
+        stroke="var(--foreground)"
+        strokeOpacity="0.4"
+        strokeWidth="1.6"
+        strokeDasharray="6 4"
+      />
+
+      {/* turbine array on the exposed ridge */}
+      {turbines.map((t, i) => (
+        <g key={i} transform={`translate(${t.x.toFixed(1)} ${t.y.toFixed(1)})`}>
+          <circle r="13" fill="none" stroke="var(--primary)" strokeOpacity="0.28" strokeWidth="0.5" />
+          <line y1="0" y2="-9" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.9" />
+          <line x1="0" y1="-9" x2="0" y2="-16" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
+          <line x1="0" y1="-9" x2="6.5" y2="-5" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
+          <line x1="0" y1="-9" x2="-6.5" y2="-5" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
         </g>
       ))}
-      <rect x="-165" y="-165" width="330" height="330" fill="none" stroke="var(--primary)" strokeWidth="1.4" strokeDasharray="5 8" opacity="0.32" />
+
+      {/* PV field on the gentle south-facing slope */}
+      <g transform="translate(-134 46)">
+        {Array.from({ length: panelRows * 10 }, (_, i) => (
+          <rect
+            key={i}
+            x={(i % 10) * 9.4}
+            y={Math.floor(i / 10) * 7.4}
+            width="7"
+            height="4.2"
+            fill="var(--primary)"
+            opacity="0.6"
+          />
+        ))}
+      </g>
+
+      {/* data halls on the graded pad */}
+      <g transform="translate(56 62)">
+        <rect x="-42" y="-20" width="84" height="42" rx="1.5" fill="var(--foreground)" opacity="0.16" />
+        {[0, 1, 2].map((i) => (
+          <rect key={i} x={-36 + i * 25} y="-14" width="21" height="30" fill="var(--foreground)" opacity="0.78" />
+        ))}
+        <rect x="-36" y="20" width="72" height="3" fill="var(--primary)" opacity="0.5" />
+      </g>
+
+      {/* survey frame, scale bar, north arrow */}
+      <rect x="-152" y="-136" width="304" height="272" fill="none" stroke="var(--primary)" strokeOpacity="0.4" strokeWidth="0.8" strokeDasharray="4 5" />
+      <g transform="translate(-144 126)">
+        <line x1="0" y1="0" x2="48" y2="0" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
+        <line x1="0" y1="-3" x2="0" y2="3" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
+        <line x1="48" y1="-3" x2="48" y2="3" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
+        <text x="0" y="-5" fill="var(--foreground)" fillOpacity="0.65" fontSize="6" letterSpacing="0.6">1 km</text>
+      </g>
+      <g transform="translate(138 -122)">
+        <path d="M0 -10 L4 6 L0 2 L-4 6 Z" fill="var(--primary)" opacity="0.8" />
+        <text x="-2.6" y="16" fill="var(--foreground)" fillOpacity="0.6" fontSize="6.5">N</text>
+      </g>
+      <text x="-150" y="-142" fill="var(--foreground)" fillOpacity="0.55" fontSize="6.5" letterSpacing="1">
+        {site.nom.toUpperCase()} · 6 KM SURVEY · {terrain.landform.replace("-", " ").toUpperCase()} · {terrain.relief} M RELIEF
+      </text>
     </motion.g>
   );
 }
+
 
 function MarkerLayer({
   sites,
@@ -313,6 +414,7 @@ export function WorldMap(props: Props) {
   const mapX = focusPoint ? CX - focusPoint.x * scale : 0;
   const mapY = focusPoint ? CY - focusPoint.y * scale : 0;
   const mapTransform = useSmoothTransform({ x: mapX, y: mapY, scale });
+  const reveal = Math.max(0, Math.min(1, (mapTransform.scale - 1.6) / (SITE_SCALE - 2.1)));
 
   useEffect(() => {
     if (!focus) {
@@ -365,19 +467,21 @@ export function WorldMap(props: Props) {
           <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeOcean)" filter="url(#glow)" opacity="0.95" />
           <Graticule />
           <CountryLayer countries={countries} />
-          <AnimatePresence>{focus && <SurveyPlan key={focus.id} site={focus} />}</AnimatePresence>
+          <AnimatePresence>{focus && reveal > 0.01 && <SiteTerrainPlan key={focus.id} site={focus} reveal={reveal} />}</AnimatePresence>
           <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
           <circle cx={CX} cy={CY} r={HOME_R} fill="none" stroke="var(--primary)" strokeOpacity="0.2" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
 
-          <MarkerLayer
-            sites={sites}
-            hoveredId={hoveredId}
-            selectedId={selectedId}
-            approachedId={approachedId}
-            onHover={onHover}
-            onSelect={onSelect}
-            panelOpen={panelOpen}
-          />
+          <g opacity={1 - reveal * 0.96} pointerEvents={reveal > 0.6 ? "none" : "auto"}>
+            <MarkerLayer
+              sites={sites}
+              hoveredId={hoveredId}
+              selectedId={selectedId}
+              approachedId={approachedId}
+              onHover={onHover}
+              onSelect={onSelect}
+              panelOpen={panelOpen}
+            />
+          </g>
         </g>
       </svg>
 
@@ -387,6 +491,42 @@ export function WorldMap(props: Props) {
           <RotateCcw aria-hidden="true" />
         </Button>
       </div>
+
+      {/* Hover readout — fixed HUD, never follows the cursor */}
+      <AnimatePresence>
+        {focus && (
+          <motion.div
+            key={focus.id}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="panel pointer-events-none absolute right-6 top-40 z-40 w-[236px] px-4 py-3 md:right-10"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="text-[13px] font-light">{focus.nom}</div>
+              <div className="label-xs">{focus.pays}</div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span
+                className="num text-[28px] leading-none"
+                style={{ color: VERDICT_COLOR[siteVerdict(focus)] }}
+              >
+                {formatLolp(referenceLolp(props.axes, focus))}%
+              </span>
+              <span className="label-xs">LOLP · ref. build</span>
+            </div>
+            <dl className="mt-3 space-y-1.5 border-t border-hairline pt-3">
+              <Readout label="Wind 100 m" value={`${focus.indicateurs.vent_100m_ms.toFixed(1)} m/s`} />
+              <Readout label="Irradiance" value={`${Math.round(focus.indicateurs.irradiance_wm2)} W/m²`} />
+              <Readout label="Air temp" value={`${focus.indicateurs.temperature_c.toFixed(1)} °C`} />
+              <Readout label="Mean PUE" value={focus.indicateurs.pue_moyen.toFixed(3)} />
+              <Readout label="Landform" value={terrainFor(focus.id, focus.latitude).landform.replace("-", " ")} />
+            </dl>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
 
       <AnimatePresence>
         {!hoveredId && (
@@ -400,6 +540,14 @@ export function WorldMap(props: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+function Readout({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="label-xs">{label}</dt>
+      <dd className="num text-[12px] text-foreground/85">{value}</dd>
     </div>
   );
 }
