@@ -93,7 +93,7 @@ export function HeroGlobe() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-y-0 right-[-18%] w-[85vw] max-w-[1100px] opacity-70 max-md:right-[-40%] max-md:opacity-40"
+      className="pointer-events-none absolute inset-y-0 right-[-18%] w-[85vw] max-w-[1100px] opacity-70 max-md:right-[-40%] max-md:opacity-65"
     >
       <div ref={container} className="h-full w-full" />
       <div

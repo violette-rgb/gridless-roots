@@ -13,6 +13,7 @@ import { Route as SitesRouteImport } from './routes/sites'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as MethodRouteImport } from './routes/method'
 import { Route as InstrumentRouteImport } from './routes/instrument'
+import { Route as GuideRouteImport } from './routes/guide'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -36,6 +37,11 @@ const InstrumentRoute = InstrumentRouteImport.update({
   path: '/instrument',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuideRoute = GuideRouteImport.update({
+  id: '/guide',
+  path: '/guide',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -50,6 +56,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/guide': typeof GuideRoute
   '/instrument': typeof InstrumentRoute
   '/method': typeof MethodRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/guide': typeof GuideRoute
   '/instrument': typeof InstrumentRoute
   '/method': typeof MethodRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/guide': typeof GuideRoute
   '/instrument': typeof InstrumentRoute
   '/method': typeof MethodRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -77,16 +86,25 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/guide'
     | '/instrument'
     | '/method'
     | '/sitemap.xml'
     | '/sites'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/instrument' | '/method' | '/sitemap.xml' | '/sites'
+  to:
+    | '/'
+    | '/about'
+    | '/guide'
+    | '/instrument'
+    | '/method'
+    | '/sitemap.xml'
+    | '/sites'
   id:
     | '__root__'
     | '/'
     | '/about'
+    | '/guide'
     | '/instrument'
     | '/method'
     | '/sitemap.xml'
@@ -96,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  GuideRoute: typeof GuideRoute
   InstrumentRoute: typeof InstrumentRoute
   MethodRoute: typeof MethodRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -132,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InstrumentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/guide': {
+      id: '/guide'
+      path: '/guide'
+      fullPath: '/guide'
+      preLoaderRoute: typeof GuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about': {
       id: '/about'
       path: '/about'
@@ -152,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  GuideRoute: GuideRoute,
   InstrumentRoute: InstrumentRoute,
   MethodRoute: MethodRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
@@ -160,13 +187,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

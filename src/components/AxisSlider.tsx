@@ -16,7 +16,7 @@ export function AxisSlider({ label, value, values, onChange, unit }: Props) {
         <span className="label-xs">{label}</span>
         <span className="num text-sm font-light tracking-tight text-foreground/85">
           {value.toLocaleString("en-US")}
-          {unit ? <span className="ml-1 opacity-40">{unit}</span> : null}
+          {unit ? <span className="ml-1 opacity-65">{unit}</span> : null}
         </span>
       </div>
       <input

@@ -4,12 +4,15 @@ import { useMemo, useState } from "react";
 import { SiteDetail } from "@/components/SiteDetail";
 import { SiteFooter } from "@/components/SiteNav";
 import {
-  bestLolp,
+  capexForBand,
   classify,
+  formatCapex,
   formatLolp,
+  headlineLolp,
   loadDataset,
   VERDICT_COLOR,
 } from "@/lib/offgrid-data";
+
 import { useHydrated } from "@/lib/hooks";
 
 export const Route = createFileRoute("/instrument")({
@@ -50,7 +53,7 @@ function InstrumentPage() {
   }, [data, selectedId]);
 
   return (
-    <main className="min-h-screen bg-[#07090c]">
+    <main className="min-h-screen bg-page">
       <section className="px-6 pb-8 pt-28 md:px-10">
         <div className="mx-auto flex max-w-[1400px] items-end justify-between gap-6 border-b border-hairline pb-8">
           <div>
@@ -73,38 +76,54 @@ function InstrumentPage() {
           <aside className="panel overflow-hidden">
             <div className="border-b border-hairline px-5 py-5">
               <div className="label-xs">Candidate sites</div>
-              <p className="mt-3 text-[12px] font-light leading-relaxed text-foreground/45">
-                Select a site; the instrument stays open with viability, profile, physics
-                and concept tabs ready.
+              <p className="mt-3 text-[12px] font-light leading-relaxed text-foreground/70">
+                Sorted by best achievable LOLP at 50 MW IT load — the hardest test. Second
+                figure is the cheapest build that holds 1 % outage.{" "}
+                <Link to="/guide" className="text-primary underline-offset-4 hover:underline">
+                  What do these mean?
+                </Link>
               </p>
+              <div className="label-xs mt-4 flex justify-between">
+                <span>Site</span>
+                <span>LOLP @ 50 MW</span>
+              </div>
             </div>
 
             <div className="max-h-[calc(100vh-18rem)] overflow-y-auto">
               {!data && !isError && <div className="label-xs px-5 py-5">Loading sites…</div>}
               {isError && <div className="label-xs px-5 py-5">Dataset unavailable.</div>}
-              {data?.sites.map((site) => {
-                const lolp = bestLolp(site);
-                const color = VERDICT_COLOR[classify(lolp)];
-                const active = selected?.id === site.id;
+              {data?.sites
+                .slice()
+                .sort((a, b) => headlineLolp(a) - headlineLolp(b))
+                .map((site) => {
+                  const lolp = headlineLolp(site);
+                  const color = VERDICT_COLOR[classify(lolp)];
+                  const active = selected?.id === site.id;
 
-                return (
-                  <button
-                    key={site.id}
-                    onClick={() => setSelectedId(site.id)}
-                    className={`flex w-full items-center justify-between border-b border-hairline px-5 py-4 text-left transition-colors duration-200 ${
-                      active ? "bg-primary/10" : "hover:bg-foreground/5"
-                    }`}
-                  >
-                    <span>
-                      <span className="block text-sm font-light">{site.nom}</span>
-                      <span className="label-xs mt-1 block">{site.pays}</span>
-                    </span>
-                    <span className="num text-sm font-light" style={{ color }}>
-                      {formatLolp(lolp)}%
-                    </span>
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={site.id}
+                      onClick={() => setSelectedId(site.id)}
+                      className={`flex w-full items-center justify-between border-b border-hairline px-5 py-4 text-left transition-colors duration-200 ${
+                        active ? "bg-primary/10" : "hover:bg-foreground/5"
+                      }`}
+                    >
+                      <span>
+                        <span className="block text-sm font-light">{site.nom}</span>
+                        <span className="label-xs mt-1 block">{site.pays}</span>
+                      </span>
+                      <span className="text-right">
+                        <span className="num block text-sm font-light" style={{ color }}>
+                          {formatLolp(lolp)} %
+                        </span>
+                        <span className="num label-xs mt-1 block">
+                          {formatCapex(capexForBand(site))}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+
             </div>
           </aside>
 

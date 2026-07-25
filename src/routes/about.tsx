@@ -25,7 +25,7 @@ export const Route = createFileRoute("/about")({
 
 function AboutPage() {
   return (
-    <main className="min-h-screen bg-[#07090c]">
+    <main className="min-h-screen bg-page">
       <section className="px-6 pb-16 pt-40 md:px-10">
         <div className="mx-auto max-w-[1400px]">
           <div className="label-xs">About</div>
@@ -91,7 +91,7 @@ function Note({ t, d }: { t: string; d: string }) {
   return (
     <div className="border-t border-hairline pt-5">
       <h2 className="text-lg font-light tracking-tight">{t}</h2>
-      <p className="mt-3 text-[13px] font-light leading-relaxed text-foreground/50">{d}</p>
+      <p className="mt-3 text-[13px] font-light leading-relaxed text-foreground/72">{d}</p>
     </div>
   );
 }

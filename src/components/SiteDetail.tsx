@@ -90,7 +90,7 @@ export function SiteDetail({
             key={t}
             onClick={() => setTab(i)}
             className={`relative py-4 text-xs uppercase tracking-[0.08em] transition-opacity duration-200 ${
-              tab === i ? "opacity-100" : "opacity-40 hover:opacity-70"
+              tab === i ? "opacity-100" : "opacity-65 hover:opacity-70"
             }`}
           >
             {t}
@@ -164,7 +164,7 @@ export function SiteDetail({
                     value={`${Math.max(2, Math.round(pIt / 10))} × 5 MW`}
                   />
                 </div>
-                <p className="max-w-xl text-sm font-light leading-relaxed text-foreground/50">
+                <p className="max-w-xl text-sm font-light leading-relaxed text-foreground/72">
                   Massing is indicative: turbine spacing at five rotor diameters, single-axis
                   PV rows at 1.2 ha per MWp, and containerised storage at 100 MWh per block.
                   Drag to orbit the site.

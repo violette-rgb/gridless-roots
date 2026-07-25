@@ -4,12 +4,15 @@ import { motion } from "framer-motion";
 import { SiteFooter } from "@/components/SiteNav";
 import { HeroGlobe } from "@/components/HeroGlobe";
 import {
-  bestLolp,
+  capexForBand,
   classify,
+  formatCapex,
   formatLolp,
+  headlineLolp,
   loadDataset,
   VERDICT_COLOR,
 } from "@/lib/offgrid-data";
+
 import { useHydrated } from "@/lib/hooks";
 
 export const Route = createFileRoute("/")({
@@ -49,7 +52,7 @@ function Landing() {
   });
 
   return (
-    <main className="min-h-screen bg-[#07090c]">
+    <main className="min-h-screen bg-page">
       {/* Hero */}
       <section className="relative flex min-h-screen items-center overflow-hidden px-6 md:px-10">
         {hydrated && <HeroGlobe />}
@@ -74,11 +77,12 @@ function Landing() {
           </motion.h1>
           <motion.p
             variants={fade}
-            className="mt-8 max-w-lg text-[15px] font-light leading-relaxed text-foreground/55"
+            className="mt-8 max-w-lg text-[15px] font-light leading-relaxed text-foreground/75"
           >
-            A grid connection in Europe takes seven to ten years. We simulate eight
+            A grid connection in Europe takes seven to ten years. We simulate eighteen
             candidate sites hour by hour across a full meteorological year and answer one
             question: can wind, solar and storage alone hold the load?
+
           </motion.p>
 
           <motion.div variants={fade} className="mt-10 flex flex-wrap gap-3">
@@ -87,6 +91,12 @@ function Landing() {
               className="rounded-full border border-primary/50 bg-primary/10 px-6 py-3 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors duration-200 hover:bg-primary/20"
             >
               Open the instrument
+            </Link>
+            <Link
+              to="/guide"
+              className="rounded-full border border-hairline px-6 py-3 text-[11px] uppercase tracking-[0.16em] opacity-75 transition-opacity duration-200 hover:opacity-100"
+            >
+              How to read this tool
             </Link>
             <Link
               to="/sites"
@@ -106,11 +116,12 @@ function Landing() {
             variants={fade}
             className="mt-20 grid max-w-3xl grid-cols-2 gap-8 border-t border-hairline pt-8 md:grid-cols-4"
           >
-            <Stat k="8" label="candidate sites" />
+            <Stat k="18" label="candidate sites" />
             <Stat k="8 760" label="hourly points / site" />
             <Stat k="3" label="IT loads simulated" />
             <Stat k="1 %" label="viability threshold" />
           </motion.dl>
+
         </motion.div>
       </section>
 
@@ -139,19 +150,36 @@ function Landing() {
       </Section>
 
       {/* Sites preview */}
-      <Section eyebrow="The sites" title="Eight locations, ranked by best achievable LOLP.">
-        <ul className="divide-y divide-hairline border-y border-hairline">
+      <Section
+        eyebrow="The sites"
+        title="Eighteen locations, ranked by the hardest test we run."
+      >
+        <p className="-mt-8 mb-8 max-w-xl text-[13px] font-light leading-relaxed text-foreground/72">
+          Each row shows two numbers. <span className="text-primary">LOLP @ 50 MW</span> is
+          the share of the year the site cannot power a 50 MW compute load, even with the
+          largest sizing we simulate. <span className="text-primary">CAPEX ≤ 1 %</span> is
+          the cheapest build that keeps outages under 1 % of the year — a dash means no
+          sizing in the grid gets there.
+        </p>
+        <div className="label-xs flex justify-between border-b border-hairline pb-3">
+          <span>Site</span>
+          <span className="flex gap-8">
+            <span className="w-28 text-right">LOLP @ 50 MW</span>
+            <span className="hidden w-32 text-right sm:inline">CAPEX ≤ 1 % LOLP</span>
+          </span>
+        </div>
+        <ul className="divide-y divide-hairline border-b border-hairline">
           {data?.sites
             .slice()
-            .sort((a, b) => bestLolp(a) - bestLolp(b))
+            .sort((a, b) => headlineLolp(a) - headlineLolp(b))
             .map((s) => {
-              const lolp = bestLolp(s);
+              const lolp = headlineLolp(s);
               const color = VERDICT_COLOR[classify(lolp)];
               return (
                 <li key={s.id}>
                   <Link
-                    to="/sites"
-                    className="group flex items-baseline justify-between py-5 transition-opacity duration-200 hover:opacity-100 md:py-6"
+                    to="/instrument"
+                    className="group flex items-baseline justify-between py-5 transition-opacity duration-200 hover:opacity-100"
                   >
                     <span className="flex items-baseline gap-4">
                       <span
@@ -163,14 +191,13 @@ function Landing() {
                       </span>
                       <span className="label-xs">{s.pays}</span>
                     </span>
-                    <span className="flex items-baseline gap-2">
-                      <span
-                        className="num text-xl font-extralight md:text-2xl"
-                        style={{ color }}
-                      >
-                        {formatLolp(lolp)}
+                    <span className="flex items-baseline gap-8">
+                      <span className="num w-28 text-right text-xl font-extralight" style={{ color }}>
+                        {formatLolp(lolp)} %
                       </span>
-                      <span className="label-xs">% LOLP</span>
+                      <span className="num hidden w-32 text-right text-[13px] font-light text-foreground/72 sm:inline">
+                        {formatCapex(capexForBand(s))}
+                      </span>
                     </span>
                   </Link>
                 </li>
@@ -180,6 +207,7 @@ function Landing() {
         </ul>
       </Section>
 
+
       {/* CTA */}
       <section className="px-6 pb-24 md:px-10">
         <div className="panel mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-6 px-8 py-12 md:flex-row md:items-center">
@@ -187,7 +215,7 @@ function Landing() {
             <h3 className="text-2xl font-extralight tracking-tight md:text-3xl">
               Open the instrument.
             </h3>
-            <p className="mt-2 max-w-md text-[13px] font-light text-foreground/50">
+            <p className="mt-2 max-w-md text-[13px] font-light text-foreground/72">
               Rotate the globe, hover a site, dial turbines, solar and storage — and watch
               the loss-of-load probability move in real time.
             </p>
@@ -242,7 +270,7 @@ function Card({ n, t, d }: { n: string; t: string; d: string }) {
     <div className="border-t border-hairline pt-5">
       <div className="num label-xs text-primary opacity-100">{n}</div>
       <h3 className="mt-4 text-lg font-light tracking-tight">{t}</h3>
-      <p className="mt-3 text-[13px] font-light leading-relaxed text-foreground/50">{d}</p>
+      <p className="mt-3 text-[13px] font-light leading-relaxed text-foreground/72">{d}</p>
     </div>
   );
 }

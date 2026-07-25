@@ -4,9 +4,11 @@ const LINKS = [
   { to: "/", label: "Index" },
   { to: "/sites", label: "Sites" },
   { to: "/instrument", label: "Instrument" },
+  { to: "/guide", label: "Guide" },
   { to: "/method", label: "Method" },
   { to: "/about", label: "About" },
 ] as const;
+
 
 export function SiteNav() {
   return (
@@ -15,7 +17,7 @@ export function SiteNav() {
         <Link to="/" className="group flex items-center gap-3">
           <span className="relative block h-2 w-2 rounded-full bg-primary shadow-[0_0_14px_var(--primary)]" />
           <span className="text-[13px] font-light uppercase tracking-[0.22em]">
-            Off<span className="opacity-40">/</span>Grid
+            Off<span className="opacity-65">/</span>Grid
           </span>
         </Link>
 
@@ -25,7 +27,7 @@ export function SiteNav() {
               key={l.to}
               to={l.to}
               activeOptions={{ exact: l.to === "/" }}
-              className="text-[11px] uppercase tracking-[0.16em] opacity-40 transition-opacity duration-200 hover:opacity-90 data-[status=active]:opacity-100"
+              className="text-[11px] uppercase tracking-[0.16em] opacity-65 transition-opacity duration-200 hover:opacity-90 data-[status=active]:opacity-100"
             >
               {l.label}
             </Link>
@@ -49,7 +51,7 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-[1400px] flex-col gap-8 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-[13px] font-light uppercase tracking-[0.22em]">
-            Off<span className="opacity-40">/</span>Grid
+            Off<span className="opacity-65">/</span>Grid
           </div>
           <p className="label-xs mt-3 max-w-xs normal-case tracking-normal">
             Siting instrument for grid-independent compute. Open-Meteo / ERA5 reanalysis,
@@ -62,9 +64,11 @@ export function SiteFooter() {
             items={[
               { to: "/sites", label: "Site explorer" },
               { to: "/instrument", label: "Sizing instrument" },
+              { to: "/guide", label: "How to read it" },
               { to: "/method", label: "Physics model" },
             ]}
           />
+
           <FooterCol
             title="Project"
             items={[

@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
-  bestLolp,
+  headlineLolp,
   classify,
   formatLolp,
   VERDICT_COLOR,
@@ -199,7 +199,7 @@ export function WorldMap({
           if (!pos) return null;
           if (angularDistance(center, [site.longitude, site.latitude]) > 78) return null;
 
-          const lolp = bestLolp(site);
+          const lolp = headlineLolp(site);
           const color = VERDICT_COLOR[classify(lolp)];
           const isHovered = hoveredId === site.id;
           const isSelected = selectedId === site.id;
@@ -268,9 +268,9 @@ export function WorldMap({
                         >
                           {formatLolp(lolp)}
                         </span>
-                        <span className="text-xs opacity-40">% LOLP</span>
+                        <span className="text-xs opacity-65">% LOLP</span>
                       </div>
-                      <div className="label-xs mt-1">best achievable</div>
+                      <div className="label-xs mt-1">best achievable @ 50 MW</div>
                     </div>
                   </motion.div>
                 )}
