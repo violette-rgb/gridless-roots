@@ -69,6 +69,7 @@ function SitesPage() {
           onSelect={setSelected}
           panelOpen={!!selected}
           onApproach={onApproach}
+          approachedId={maquette?.id ?? null}
         />
       )}
 

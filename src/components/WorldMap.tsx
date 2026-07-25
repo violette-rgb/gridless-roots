@@ -65,6 +65,8 @@ interface Props {
   panelOpen: boolean;
   /** Fires once the camera has descended to site scale on a sustained hover. */
   onApproach?: (id: string | null) => void;
+  /** Site whose maquette is on screen — its map tooltip is suppressed. */
+  approachedId?: string | null;
 }
 
 export function WorldMap({
@@ -76,6 +78,7 @@ export function WorldMap({
   onSelect,
   panelOpen,
   onApproach,
+  approachedId,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
@@ -290,7 +293,7 @@ export function WorldMap({
               />
 
               <AnimatePresence>
-                {isHovered && (
+                {isHovered && approachedId !== site.id && (
                   <motion.div
                     initial={{ opacity: 0, x: flip ? 12 : -12 }}
                     animate={{ opacity: 1, x: 0 }}
