@@ -471,15 +471,17 @@ export function WorldMap(props: Props) {
           <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
           <circle cx={CX} cy={CY} r={HOME_R} fill="none" stroke="var(--primary)" strokeOpacity="0.2" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
 
-          <MarkerLayer
-            sites={sites}
-            hoveredId={hoveredId}
-            selectedId={selectedId}
-            approachedId={approachedId}
-            onHover={onHover}
-            onSelect={onSelect}
-            panelOpen={panelOpen}
-          />
+          <g opacity={1 - reveal * 0.96} pointerEvents={reveal > 0.6 ? "none" : "auto"}>
+            <MarkerLayer
+              sites={sites}
+              hoveredId={hoveredId}
+              selectedId={selectedId}
+              approachedId={approachedId}
+              onHover={onHover}
+              onSelect={onSelect}
+              panelOpen={panelOpen}
+            />
+          </g>
         </g>
       </svg>
 
