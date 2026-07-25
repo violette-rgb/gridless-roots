@@ -87,8 +87,8 @@ export function WorldMap({
       map = new maplibregl.Map({
         container: container.current,
         style: STYLE_URL,
-        center: [10, 55],
-        zoom: 3.2,
+        center: [10, 40],
+        zoom: 1.55,
         pitch: 0,
         attributionControl: { compact: true },
         maxPitch: 75,
@@ -98,6 +98,11 @@ export function WorldMap({
       m.on("error", (e) => console.error("[maplibre]", e?.error ?? e));
       m.on("load", () => {
         m.resize();
+        try {
+          m.setProjection({ type: "globe" });
+        } catch (e) {
+          console.error("[maplibre] globe projection unavailable", e);
+        }
         m.addSource("graticule", { type: "geojson", data: graticule() });
         m.addLayer({
           id: "graticule",
@@ -106,9 +111,13 @@ export function WorldMap({
           paint: { "line-color": "#7fd6f2", "line-opacity": 0.07, "line-width": 0.5 },
         });
         setReady(true);
+        setCenter(m.getCenter().toArray() as [number, number]);
         project(m);
       });
-      m.on("move", () => project(m));
+      m.on("move", () => {
+        project(m);
+        setCenter(m.getCenter().toArray() as [number, number]);
+      });
       m.on("render", () => project(m));
       requestAnimationFrame(() => m.resize());
     })();
@@ -119,15 +128,40 @@ export function WorldMap({
     };
   }, [project]);
 
+  // Hover: swing the globe over the site's country
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || selectedId) return;
+    const site = sites.find((s) => s.id === hoveredId);
+    if (!site) {
+      const t = setTimeout(
+        () =>
+          mapRef.current?.easeTo({
+            center: [10, 40],
+            zoom: 1.55,
+            pitch: 0,
+            bearing: 0,
+            duration: 1600,
+          }),
+        220,
+      );
+      return () => clearTimeout(t);
+    }
+    map.easeTo({
+      center: [site.longitude, site.latitude],
+      zoom: 4.2,
+      pitch: 0,
+      bearing: 0,
+      duration: 1500,
+    });
+  }, [hoveredId, selectedId, ready, sites]);
+
   // Fly to selection
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
     const site = sites.find((s) => s.id === selectedId);
-    if (!site) {
-      map.easeTo({ center: [10, 55], zoom: 3.2, pitch: 0, bearing: 0, duration: 1600, padding: { left: 0, right: 0 } });
-      return;
-    }
+    if (!site) return;
     map.flyTo({
       center: [site.longitude, site.latitude],
       zoom: 10.5,
@@ -140,6 +174,7 @@ export function WorldMap({
       padding: { right: Math.round(window.innerWidth * 0.55), left: 0, top: 0, bottom: 0 },
     });
   }, [selectedId, ready, sites]);
+
 
   return (
     <div className="absolute inset-0">
