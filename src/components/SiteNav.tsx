@@ -4,9 +4,11 @@ const LINKS = [
   { to: "/", label: "Index" },
   { to: "/sites", label: "Sites" },
   { to: "/instrument", label: "Instrument" },
+  { to: "/guide", label: "Guide" },
   { to: "/method", label: "Method" },
   { to: "/about", label: "About" },
 ] as const;
+
 
 export function SiteNav() {
   return (
