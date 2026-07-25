@@ -143,7 +143,7 @@ export function WorldMap({
 
   return (
     <div className="absolute inset-0">
-      <div ref={container} className="absolute inset-0" />
+      <div ref={container} className="absolute inset-0 h-full w-full" />
       <div className="vignette pointer-events-none absolute inset-0" />
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
