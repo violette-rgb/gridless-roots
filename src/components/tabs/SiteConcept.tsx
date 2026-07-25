@@ -85,7 +85,7 @@ function Scene({
           <circleGeometry args={[34, 64]} />
           <meshStandardMaterial color="#0a0f18" roughness={1} />
         </mesh>
-        <gridHelper args={[68, 68, "#1d3murl", "#12212e"]} position={[0, 0, 0]} />
+        <gridHelper args={[68, 68, "#1d3a4a", "#12212e"]} position={[0, 0, 0]} />
 
         {/* Data centre halls */}
         {Array.from({ length: halls }).map((_, i) => (
