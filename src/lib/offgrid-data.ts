@@ -147,3 +147,42 @@ export async function loadDataset(): Promise<Dataset> {
   if (!res.ok) throw new Error("Unable to load dataset");
   return (await res.json()) as Dataset;
 }
+
+/** Reference build used to compare sites on equal terms (not the max sizing). */
+export const REFERENCE_BUILD = { turbines: 40, pv_mw: 100, batt_mwh: 800 };
+
+function nearestIndex(axis: number[], value: number) {
+  let best = 0;
+  for (let i = 1; i < axis.length; i++) {
+    if (Math.abs(axis[i] - value) < Math.abs(axis[best] - value)) best = i;
+  }
+  return best;
+}
+
+/**
+ * LOLP at the reference build (40 turbines · 100 MWp · 800 MWh) under the
+ * heaviest simulated IT load. This is the number that actually separates sites,
+ * unlike the best-achievable value which saturates at 0 % for many of them.
+ */
+export function referenceLolp(axes: GrilleAxes, site: Site) {
+  const heaviest = site.scenarios.reduce((a, b) => (b.p_it_mw > a.p_it_mw ? b : a));
+  const idx = gridIndex(
+    axes,
+    nearestIndex(axes.turbines, REFERENCE_BUILD.turbines),
+    nearestIndex(axes.pv_mw, REFERENCE_BUILD.pv_mw),
+    nearestIndex(axes.batt_mwh, REFERENCE_BUILD.batt_mwh),
+  );
+  return heaviest.grille.lolp[idx];
+}
+
+/**
+ * Verdict for a site as a whole: can any simulated build hold 1 % outage at the
+ * heaviest load (viable), only 5–10 % (marginal), or nothing at all (failure)?
+ */
+export function siteVerdict(site: Site): Verdict {
+  const heaviest = site.scenarios.reduce((a, b) => (b.p_it_mw > a.p_it_mw ? b : a));
+  const bands = heaviest.dimensionnement_optimal ?? {};
+  if (bands["0.1%"] || bands["1%"]) return "viable";
+  if (bands["5%"] || bands["10%"]) return "marginal";
+  return "failure";
+}

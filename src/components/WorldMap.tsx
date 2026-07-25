@@ -3,8 +3,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
-  headlineLolp,
-  classify,
+  referenceLolp,
+  type GrilleAxes,
+  siteVerdict,
   formatLolp,
   VERDICT_COLOR,
   type Site,
@@ -56,6 +57,7 @@ function angularDistance(a: [number, number], b: [number, number]) {
 
 interface Props {
   sites: Site[];
+  axes: GrilleAxes;
   selectedId: string | null;
   hoveredId: string | null;
   onHover: (id: string | null) => void;
@@ -65,6 +67,7 @@ interface Props {
 
 export function WorldMap({
   sites,
+  axes,
   selectedId,
   hoveredId,
   onHover,
@@ -122,6 +125,27 @@ export function WorldMap({
           source: "graticule",
           paint: { "line-color": "#7fd6f2", "line-opacity": 0.07, "line-width": 0.5 },
         });
+        // Lift the basemap out of near-black so the landmasses read clearly.
+        for (const layer of m.getStyle().layers ?? []) {
+          const id = layer.id;
+          try {
+            if (layer.type === "background") {
+              m.setPaintProperty(id, "background-color", "#0e1620");
+            } else if (layer.type === "fill" && /water|ocean|sea|river/i.test(id)) {
+              m.setPaintProperty(id, "fill-color", "#0b1a27");
+            } else if (layer.type === "fill" && /earth|land|park|wood|sand|glacier/i.test(id)) {
+              m.setPaintProperty(id, "fill-color", "#26323d");
+            } else if (layer.type === "line" && /boundary|admin/i.test(id)) {
+              m.setPaintProperty(id, "line-color", "#7fd6f2");
+              m.setPaintProperty(id, "line-opacity", 0.35);
+            } else if (layer.type === "symbol") {
+              m.setPaintProperty(id, "text-color", "#cfe1ec");
+              m.setPaintProperty(id, "text-halo-color", "#0a1119");
+            }
+          } catch {
+            /* layer does not support this paint property */
+          }
+        }
         setReady(true);
         setCenter(m.getCenter().toArray() as [number, number]);
         project(m);
@@ -199,8 +223,8 @@ export function WorldMap({
           if (!pos) return null;
           if (angularDistance(center, [site.longitude, site.latitude]) > 78) return null;
 
-          const lolp = headlineLolp(site);
-          const color = VERDICT_COLOR[classify(lolp)];
+          const lolp = referenceLolp(axes, site);
+          const color = VERDICT_COLOR[siteVerdict(site)];
           const isHovered = hoveredId === site.id;
           const isSelected = selectedId === site.id;
           const dimmed = (hoveredId && !isHovered) || (panelOpen && !isSelected);
@@ -270,7 +294,7 @@ export function WorldMap({
                         </span>
                         <span className="text-xs opacity-65">% LOLP</span>
                       </div>
-                      <div className="label-xs mt-1">best achievable @ 50 MW</div>
+                      <div className="label-xs mt-1">reference build · 50 MW</div>
                     </div>
                   </motion.div>
                 )}

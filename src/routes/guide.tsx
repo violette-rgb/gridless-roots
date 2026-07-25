@@ -31,10 +31,10 @@ const TERMS = [
     body: "The share of the 8 760 hours in the year where production plus battery cannot cover the load. 1 % = 88 hours of blackout per year. It is the headline number everywhere in this tool.",
   },
   {
-    term: "LOLP @ 50 MW",
+    term: "LOLP · ref build",
     unit: "%",
-    short: "The hardest test",
-    body: "Best achievable LOLP when the data center draws 50 MW of IT power — the largest load simulated, with the largest sizing available (100 turbines, 400 MWp, 2 900 MWh). If this is 0 %, the site is fully autonomous even at full load.",
+    short: "The comparison number",
+    body: "LOLP at one identical build for every site — 40 turbines, 100 MWp of solar, 800 MWh of storage — under a 50 MW IT load. Because the build is fixed, the ranking measures the weather alone. Push the sliders to the maximum and most sites reach 0 %, which is why the index uses this reference instead.",
   },
   {
     term: "Deficit hours",

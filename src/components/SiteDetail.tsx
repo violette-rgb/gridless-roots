@@ -4,7 +4,9 @@ import { ViabilityTab } from "@/components/tabs/ViabilityTab";
 import { ProfileTab } from "@/components/tabs/ProfileTab";
 import { ModelTab } from "@/components/tabs/ModelTab";
 import { useHydrated } from "@/lib/hooks";
+import { terrainFor } from "@/lib/terrain";
 import type { Dataset, Site } from "@/lib/offgrid-data";
+
 
 const SiteConcept = lazy(() => import("@/components/tabs/SiteConcept"));
 
@@ -142,7 +144,15 @@ export function SiteDetail({
                       <div className="label-xs h-[420px] rounded-xl border border-hairline" />
                     }
                   >
-                    <SiteConcept turbines={turbines} pv={pv} batt={batt} pIt={pIt} />
+                    <SiteConcept
+                      siteId={site.id}
+                      latitude={site.latitude}
+                      turbines={turbines}
+                      pv={pv}
+                      batt={batt}
+                      pIt={pIt}
+                    />
+
                   </Suspense>
                 ) : null}
                 <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline sm:grid-cols-4">
@@ -164,11 +174,23 @@ export function SiteDetail({
                     value={`${Math.max(2, Math.round(pIt / 10))} × 5 MW`}
                   />
                 </div>
-                <p className="max-w-xl text-sm font-light leading-relaxed text-foreground/72">
-                  Massing is indicative: turbine spacing at five rotor diameters, single-axis
-                  PV rows at 1.2 ha per MWp, and containerised storage at 100 MWh per block.
-                  Drag to orbit the site.
-                </p>
+                <div className="max-w-2xl space-y-2">
+                  <div className="label-xs">
+                    Landform · {terrainFor(site.id, site.latitude).landform.replace("-", " ")} ·{" "}
+                    {terrainFor(site.id, site.latitude).relief} m relief across 6 km
+                  </div>
+                  <p className="text-sm font-light leading-relaxed text-foreground/75">
+                    {terrainFor(site.id, site.latitude).note}
+                  </p>
+                  <p className="text-[13px] font-light leading-relaxed text-foreground/72">
+                    The plan is laid out on the site's own topography: contour interval reads
+                    the synthetic 6 km survey square, rotors take the highest wind-exposed
+                    ground at five rotor diameters apart, the solar field occupies low-slope
+                    south-facing ground with row tilt set by latitude, and halls plus storage
+                    sit on the flattest graded pad. Drag to orbit.
+                  </p>
+                </div>
+
               </div>
             )}
           </motion.div>
