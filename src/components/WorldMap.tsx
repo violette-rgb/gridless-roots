@@ -3,10 +3,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  referenceLolp,
   type GrilleAxes,
   siteVerdict,
-  formatLolp,
   VERDICT_COLOR,
   type Site,
 } from "@/lib/offgrid-data";
@@ -223,7 +221,6 @@ function MarkerLayer({
       {sites.map((site) => {
         const p = projectPoint(site.longitude, site.latitude, HOME_VIEW);
         if (!p.visible) return null;
-        const lolp = referenceLolp(axes, site);
         const color = VERDICT_COLOR[siteVerdict(site)];
         const isHovered = hoveredId === site.id;
         const isSelected = selectedId === site.id;
@@ -264,20 +261,7 @@ function MarkerLayer({
                 onSelect(site);
               }}
             />
-            {isHovered && approachedId !== site.id && (
-              <foreignObject x={Math.min(780, p.x + 22)} y={Math.max(130, p.y - 52)} width="230" height="110" className="pointer-events-none overflow-visible">
-                <div className="panel whitespace-nowrap px-4 py-2.5 shadow-2xl">
-                  <div className="label-xs">{site.nom} · {site.pays}</div>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <span className="num text-3xl font-extralight leading-none" style={{ color }}>
-                      {formatLolp(lolp)}
-                    </span>
-                    <span className="text-xs opacity-65">% LOLP</span>
-                  </div>
-                  <div className="label-xs mt-1">reference build · 50 MW</div>
-                </div>
-              </foreignObject>
-            )}
+            {isHovered && approachedId !== site.id && <circle cx={p.x} cy={p.y} r="34" fill="none" stroke={color} strokeOpacity="0.28" strokeWidth="1.2" />}
           </g>
         );
       })}
