@@ -466,7 +466,7 @@ export function WorldMap(props: Props) {
           <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeOcean)" filter="url(#glow)" opacity="0.95" />
           <Graticule />
           <CountryLayer countries={countries} />
-          <AnimatePresence>{focus && <SurveyPlan key={focus.id} site={focus} />}</AnimatePresence>
+          <AnimatePresence>{focus && reveal > 0.01 && <SiteTerrainPlan key={focus.id} site={focus} reveal={reveal} />}</AnimatePresence>
           <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
           <circle cx={CX} cy={CY} r={HOME_R} fill="none" stroke="var(--primary)" strokeOpacity="0.2" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
 
