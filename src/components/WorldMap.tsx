@@ -414,6 +414,7 @@ export function WorldMap(props: Props) {
   const mapX = focusPoint ? CX - focusPoint.x * scale : 0;
   const mapY = focusPoint ? CY - focusPoint.y * scale : 0;
   const mapTransform = useSmoothTransform({ x: mapX, y: mapY, scale });
+  const reveal = Math.max(0, Math.min(1, (mapTransform.scale - 2.1) / (SITE_SCALE - 2.6)));
 
   useEffect(() => {
     if (!focus) {
