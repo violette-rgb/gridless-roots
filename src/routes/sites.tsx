@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useState } from "react";
 import { terrainFor } from "@/lib/terrain";
 import SiteConcept from "@/components/tabs/SiteConcept";
-import { WorldMap } from "@/components/WorldMap";
+import { WorldMap, type ZoomStage } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,16 +51,25 @@ function SitesPage() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<Site | null>(null);
   const [approached, setApproached] = useState<string | null>(null);
+  const [zoomStage, setZoomStage] = useState<ZoomStage>("globe");
+  const [zoomSiteId, setZoomSiteId] = useState<string | null>(null);
   const onApproach = useCallback((id: string | null) => setApproached(id), []);
+  const onZoomStageChange = useCallback((stage: ZoomStage, siteId: string | null) => {
+    setZoomStage(stage);
+    setZoomSiteId(siteId);
+  }, []);
   const returnToGlobe = useCallback(() => {
     setHovered(null);
     setApproached(null);
     setSelected(null);
+    setZoomStage("globe");
+    setZoomSiteId(null);
   }, []);
   const maquette =
     !selected && approached && approached === hovered
       ? (data?.sites.find((s) => s.id === approached) ?? null)
       : null;
+  const zoomSite = zoomSiteId ? (data?.sites.find((s) => s.id === zoomSiteId) ?? null) : null;
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-page">
@@ -75,6 +84,7 @@ function SitesPage() {
           panelOpen={!!selected}
           onApproach={onApproach}
           approachedId={maquette?.id ?? null}
+          onZoomStageChange={onZoomStageChange}
         />
       )}
 
@@ -87,7 +97,7 @@ function SitesPage() {
       >
         <div className="label-xs">Candidate sites</div>
         <p className="mt-3 max-w-[240px] text-[12px] font-light leading-relaxed text-foreground/72">
-          Hover a row to swing the globe over its country. Click to open the instrument.
+          Hover or tap a row to descend: globe, country, city, then site maquette. Click to open the instrument.
           The figure is LOLP for a common reference build — 40 turbines, 100 MWp, 800 MWh — at 50 MW IT load, so sites are comparable.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -129,7 +139,8 @@ function SitesPage() {
                   <Button
                     type="button"
                     variant="ghost"
-                    onMouseEnter={() => setHovered(s.id)}
+                      onMouseEnter={() => setHovered(s.id)}
+                      onPointerEnter={() => setHovered(s.id)}
                     onFocus={() => setHovered(s.id)}
                     onClick={() => {
                       setHovered(s.id);
@@ -162,6 +173,26 @@ function SitesPage() {
         {!data && !isError && <p className="label-xs mt-6">Loading 18 sites…</p>}
         {isError && <p className="label-xs mt-6">Dataset unavailable.</p>}
       </motion.aside>
+
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: selected ? 0 : 1, y: selected ? -10 : 0 }}
+        transition={{ duration: 0.35 }}
+        className="panel absolute left-1/2 top-24 z-30 w-[min(560px,calc(100vw-340px))] -translate-x-1/2 px-4 py-3"
+      >
+        <div className="flex items-baseline justify-between gap-4">
+          <div className="label-xs">
+            {zoomSite ? `${zoomSite.nom} · ${zoomSite.pays}` : "Globe overview"}
+          </div>
+          <div className="label-xs text-primary opacity-100">{zoomStage}</div>
+        </div>
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          <ScaleStep label="Globe" active={zoomStage === "globe"} done={zoomStage !== "globe"} />
+          <ScaleStep label="Country" active={zoomStage === "country"} done={zoomStage === "city" || zoomStage === "site"} />
+          <ScaleStep label="City" active={zoomStage === "city"} done={zoomStage === "site"} />
+          <ScaleStep label="Site" active={zoomStage === "site"} done={false} />
+        </div>
+      </motion.div>
 
       <div className="pointer-events-none absolute bottom-16 left-6 z-30 flex gap-4 md:left-10">
         <Key color="var(--viable)" text="Viable ≤ 1 %" />
@@ -231,5 +262,20 @@ function Key({ color, text }: { color: string; text: string }) {
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
       {text}
     </span>
+  );
+}
+
+function ScaleStep({ label, active, done }: { label: string; active: boolean; done: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div
+        className={`h-1 rounded-full transition-colors duration-300 ${
+          active || done ? "bg-primary" : "bg-muted"
+        }`}
+      />
+      <div className={`label-xs mt-2 truncate ${active ? "text-primary opacity-100" : "opacity-55"}`}>
+        {label}
+      </div>
+    </div>
   );
 }
