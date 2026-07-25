@@ -207,14 +207,13 @@ function SurveyPlan({ site }: { site: Site | null }) {
 
 function MarkerLayer({
   sites,
-  axes,
   hoveredId,
   selectedId,
   approachedId,
   onHover,
   onSelect,
   panelOpen,
-}: Pick<Props, "sites" | "axes" | "hoveredId" | "selectedId" | "approachedId" | "onHover" | "onSelect" | "panelOpen">) {
+}: Pick<Props, "sites" | "hoveredId" | "selectedId" | "approachedId" | "onHover" | "onSelect" | "panelOpen">) {
   const focusId = selectedId ?? hoveredId;
   return (
     <g>
@@ -270,7 +269,7 @@ function MarkerLayer({
 }
 
 export function WorldMap(props: Props) {
-  const { sites, axes, selectedId, hoveredId, approachedId, onHover, onSelect, panelOpen, onApproach, onZoomStageChange } = props;
+  const { sites, selectedId, hoveredId, approachedId, onHover, onSelect, panelOpen, onApproach, onZoomStageChange } = props;
   const countries = useCountries();
   const focusId = selectedId ?? hoveredId;
   const focus = focusId ? sites.find((site) => site.id === focusId) ?? null : null;
@@ -340,7 +339,6 @@ export function WorldMap(props: Props) {
 
           <MarkerLayer
             sites={sites}
-            axes={axes}
             hoveredId={hoveredId}
             selectedId={selectedId}
             approachedId={approachedId}
