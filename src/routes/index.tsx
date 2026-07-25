@@ -27,6 +27,8 @@ export const Route = createFileRoute("/")({
         content:
           "Eight European sites, 8760 hourly points each, one number: LOLP. A decision-support instrument for grid-independent compute.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Landing,
@@ -81,8 +83,14 @@ function Landing() {
 
           <motion.div variants={fade} className="mt-10 flex flex-wrap gap-3">
             <Link
-              to="/sites"
+              to="/instrument"
               className="rounded-full border border-primary/50 bg-primary/10 px-6 py-3 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors duration-200 hover:bg-primary/20"
+            >
+              Open the instrument
+            </Link>
+            <Link
+              to="/sites"
+              className="rounded-full border border-hairline px-6 py-3 text-[11px] uppercase tracking-[0.16em] opacity-60 transition-opacity duration-200 hover:opacity-100"
             >
               Explore the globe
             </Link>
@@ -185,10 +193,10 @@ function Landing() {
             </p>
           </div>
           <Link
-            to="/sites"
+            to="/instrument"
             className="rounded-full border border-primary/50 bg-primary/10 px-6 py-3 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors hover:bg-primary/20"
           >
-            Launch site explorer
+            Launch instrument
           </Link>
         </div>
       </section>

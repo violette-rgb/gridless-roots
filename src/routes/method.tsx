@@ -17,6 +17,8 @@ export const Route = createFileRoute("/method")({
         content:
           "Betz-limited wind, temperature-derated solar, Carnot-derived cooling and hourly battery integration across a full meteorological year.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: MethodPage,
@@ -62,7 +64,7 @@ function MethodPage() {
         </div>
         <div className="mx-auto mt-14 max-w-[1400px]">
           <Link
-            to="/sites"
+            to="/instrument"
             className="rounded-full border border-primary/50 bg-primary/10 px-6 py-3 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors hover:bg-primary/20"
           >
             See it applied
