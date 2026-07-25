@@ -372,9 +372,11 @@ export default function SiteConcept(props: {
   pv: number;
   batt: number;
   pIt: number;
+  heightClass?: string;
 }) {
+  const { heightClass = "h-[460px]", ...scene } = props;
   return (
-    <div className="h-[460px] w-full overflow-hidden rounded-xl border border-hairline bg-[#05070b]">
+    <div className={`${heightClass} w-full overflow-hidden rounded-xl border border-hairline bg-[#05070b]`}>
       <Canvas
         camera={{ position: [0, 62, 118], fov: 42 }}
         dpr={[1, 1.5]}
@@ -384,7 +386,7 @@ export default function SiteConcept(props: {
         }}
       >
         <fog attach="fog" args={["#05070b", 190, 420]} />
-        <Scene {...props} />
+        <Scene {...scene} />
       </Canvas>
     </div>
   );
