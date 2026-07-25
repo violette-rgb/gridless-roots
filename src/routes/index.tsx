@@ -4,12 +4,15 @@ import { motion } from "framer-motion";
 import { SiteFooter } from "@/components/SiteNav";
 import { HeroGlobe } from "@/components/HeroGlobe";
 import {
-  bestLolp,
+  capexForBand,
   classify,
+  formatCapex,
   formatLolp,
+  headlineLolp,
   loadDataset,
   VERDICT_COLOR,
 } from "@/lib/offgrid-data";
+
 import { useHydrated } from "@/lib/hooks";
 
 export const Route = createFileRoute("/")({
