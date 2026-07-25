@@ -1,17 +1,18 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { WorldMap } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
 import {
-  bestLolp,
   classify,
   formatLolp,
+  headlineLolp,
   loadDataset,
   VERDICT_COLOR,
   type Site,
 } from "@/lib/offgrid-data";
+
 import { useHydrated } from "@/lib/hooks";
 
 export const Route = createFileRoute("/sites")({
