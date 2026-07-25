@@ -262,7 +262,7 @@ export function WorldMap({
           return (
             <div
               key={site.id}
-              className="pointer-events-auto absolute"
+              className="pointer-events-auto absolute flex h-11 w-11 items-center justify-center"
               style={{
                 left: pos.x,
                 top: pos.y,
@@ -311,8 +311,8 @@ export function WorldMap({
                     className="absolute top-1/2 flex items-center gap-0"
                     style={
                       flip
-                        ? { right: 10, flexDirection: "row-reverse" }
-                        : { left: 10 }
+                        ? { right: 30, flexDirection: "row-reverse" }
+                        : { left: 30 }
                     }
                   >
                     <span
