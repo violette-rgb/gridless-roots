@@ -187,30 +187,45 @@ export function WorldMap({
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
-  const descentRef = useRef(0);
+  const markerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const loadedOnce = useRef(false);
+  const flightTarget = useRef<string | null>(null);
+  const stageRef = useRef<ZoomStage>("globe");
+  const approachedRef = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
   const [mapEpoch, setMapEpoch] = useState(0);
-  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
-  const [center, setCenter] = useState<[number, number]>(INITIAL_CENTER);
   const [zoomStage, setZoomStage] = useState<ZoomStage>("globe");
 
-  const updateStage = useCallback(
-    (stage: ZoomStage, siteId: string | null) => {
-      setZoomStage(stage);
-      onZoomStageChange?.(stage, siteId);
-    },
-    [onZoomStageChange],
-  );
+  const onHoverRef = useRef(onHover);
+  const onApproachRef = useRef(onApproach);
+  const onStageRef = useRef(onZoomStageChange);
+  onHoverRef.current = onHover;
+  onApproachRef.current = onApproach;
+  onStageRef.current = onZoomStageChange;
 
-  const project = useCallback(
-    (map: MLMap) => {
-      const next: Record<string, { x: number; y: number }> = {};
+  const updateStage = useCallback((stage: ZoomStage, siteId: string | null) => {
+    if (stageRef.current === stage) return;
+    stageRef.current = stage;
+    setZoomStage(stage);
+    onStageRef.current?.(stage, siteId);
+  }, []);
+
+  // Marker positions are written straight to the DOM — never through React
+  // state — so a moving camera cannot re-render the page 60 times a second.
+  const syncMarkers = useCallback(
+    (m: MLMap) => {
+      const c = m.getCenter();
+      const centre: [number, number] = [c.lng, c.lat];
+      const onGlobe = m.getZoom() < 5.5;
       for (const s of sites) {
-        const p = map.project([s.longitude, s.latitude]);
-        next[s.id] = { x: p.x, y: p.y };
+        const el = markerRefs.current[s.id];
+        if (!el) continue;
+        const p = m.project([s.longitude, s.latitude]);
+        const behind = onGlobe && angularDistance(centre, [s.longitude, s.latitude]) > 78;
+        el.style.transform = `translate3d(${p.x}px, ${p.y}px, 0) translate(-50%, -50%)`;
+        el.style.visibility = behind ? "hidden" : "visible";
       }
-      setPositions(next);
     },
     [sites],
   );
@@ -222,15 +237,15 @@ export function WorldMap({
     let loadTimer = 0;
     let canvas: HTMLCanvasElement | null = null;
     const handleContextLost = (event: Event) => {
+      // Let the browser hand the context back instead of tearing the globe down.
       event.preventDefault();
-      setMapFailed(true);
-      setReady(false);
     };
-    const handleContextRestored = () => setMapEpoch((n) => n + 1);
+    const handleContextRestored = () => {
+      mapRef.current?.resize();
+      mapRef.current?.triggerRepaint();
+    };
     (async () => {
-      setReady(false);
       setMapFailed(false);
-      setPositions({});
       const maplibregl = await import("maplibre-gl");
       if (cancelled || !container.current) return;
       map = new maplibregl.Map({
@@ -241,6 +256,8 @@ export function WorldMap({
         pitch: 0,
         attributionControl: { compact: true },
         maxPitch: 75,
+        fadeDuration: 120,
+        antialias: true,
       });
       mapRef.current = map;
       const m = map;
@@ -250,11 +267,12 @@ export function WorldMap({
       resizeObserver = new ResizeObserver(() => m.resize());
       resizeObserver.observe(container.current);
       loadTimer = window.setTimeout(() => {
-        if (!cancelled && !m.loaded()) setMapFailed(true);
-      }, 7000);
+        if (!cancelled && !loadedOnce.current) setMapFailed(true);
+      }, 9000);
       m.on("error", (e) => console.error("[maplibre]", e?.error ?? e));
       m.on("load", () => {
         window.clearTimeout(loadTimer);
+        loadedOnce.current = true;
         m.resize();
         try {
           m.setProjection({ type: "globe" });
@@ -335,14 +353,25 @@ export function WorldMap({
 
         setMapFailed(false);
         setReady(true);
-        setCenter(m.getCenter().toArray() as [number, number]);
-        project(m);
+        syncMarkers(m);
       });
-      m.on("move", () => {
-        project(m);
-        setCenter(m.getCenter().toArray() as [number, number]);
+      // DOM-only work: safe to run every frame.
+      m.on("render", () => syncMarkers(m));
+      // Stage read from the live camera altitude, so labels track the single
+      // continuous flight instead of driving it.
+      m.on("zoom", () => {
+        const z = m.getZoom();
+        const id = flightTarget.current;
+        const stage: ZoomStage = !id ? "globe" : z < 3.4 ? "globe" : z < 6.6 ? "country" : z < 10.4 ? "city" : "site";
+        updateStage(stage, id);
+        if (id && stage === "site" && approachedRef.current !== id) {
+          approachedRef.current = id;
+          onApproachRef.current?.(id);
+        } else if (stage !== "site" && approachedRef.current) {
+          approachedRef.current = null;
+          onApproachRef.current?.(null);
+        }
       });
-      m.on("render", () => project(m));
       requestAnimationFrame(() => m.resize());
     })();
     return () => {
@@ -354,11 +383,13 @@ export function WorldMap({
       map?.remove();
       mapRef.current = null;
     };
-  }, [project, mapEpoch]);
+  }, [syncMarkers, updateStage, mapEpoch]);
 
   const resetToGlobe = useCallback(() => {
-    onHover(null);
-    onApproach?.(null);
+    onHoverRef.current(null);
+    approachedRef.current = null;
+    onApproachRef.current?.(null);
+    flightTarget.current = null;
     updateStage("globe", null);
     const map = mapRef.current;
     if (!map || !ready) return;
@@ -368,98 +399,76 @@ export function WorldMap({
       zoom: INITIAL_ZOOM,
       pitch: 0,
       bearing: 0,
-      duration: 1200,
+      duration: 1600,
+      essential: true,
     });
-  }, [onApproach, onHover, ready, updateStage]);
+  }, [ready, updateStage]);
 
   const reloadMap = useCallback(() => {
-    onHover(null);
-    onApproach?.(null);
+    onHoverRef.current(null);
+    approachedRef.current = null;
+    onApproachRef.current?.(null);
+    flightTarget.current = null;
     updateStage("globe", null);
+    loadedOnce.current = false;
+    setReady(false);
     setMapEpoch((n) => n + 1);
-  }, [onApproach, onHover, updateStage]);
+  }, [updateStage]);
 
-  // Hover: cinematic descent — globe → country → city → site scale.
+  // Hover: ONE continuous flight from globe altitude down to site scale.
+  // A single flyTo keeps the camera velocity continuous — no restarts, no snap.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || selectedId) return;
     const site = sites.find((s) => s.id === hoveredId);
-    const descent = ++descentRef.current;
+
     if (!site) {
-      onApproach?.(null);
-      updateStage("globe", null);
-      const t = setTimeout(
-        () =>
-          mapRef.current?.easeTo({
-            center: INITIAL_CENTER,
-            zoom: INITIAL_ZOOM,
-            pitch: 0,
-            bearing: 0,
-            duration: 1600,
-          }),
-        220,
-      );
-      return () => clearTimeout(t);
+      const t = window.setTimeout(() => {
+        flightTarget.current = null;
+        const m = mapRef.current;
+        if (!m) return;
+        m.stop();
+        m.easeTo({
+          center: INITIAL_CENTER,
+          zoom: INITIAL_ZOOM,
+          pitch: 0,
+          bearing: 0,
+          duration: 2000,
+          essential: true,
+        });
+      }, 260);
+      return () => window.clearTimeout(t);
     }
-    const target: [number, number] = [site.longitude, site.latitude];
-    const padding = {
-      left: Math.min(340, Math.round(window.innerWidth * 0.28)),
-      right: Math.min(90, Math.round(window.innerWidth * 0.06)),
-      top: 90,
-      bottom: 110,
-    };
-    map.stop();
-    onApproach?.(null);
-    updateStage("country", site.id);
-    // 1 — country scale: keep a readable national outline before descending.
-    map.flyTo({
-      center: target,
-      zoom: 4.35,
-      pitch: 0,
-      bearing: 0,
-      duration: 1150,
-      curve: 1.65,
-      padding,
-      essential: true,
-    });
-    // 2 — city scale: labels/roads/terrain become legible.
-    const t2 = setTimeout(() => {
-      if (descentRef.current !== descent) return;
-      updateStage("city", site.id);
-      mapRef.current?.flyTo({
-        center: target,
-        zoom: 8.25,
-        pitch: 38,
-        bearing: -12,
-        duration: 1350,
-        curve: 1.25,
-        padding,
-        essential: true,
-      });
-    }, 1250);
-    // 3 — site scale: hand over to the physical topographic maquette.
-    const t3 = setTimeout(() => {
-      if (descentRef.current !== descent) return;
-      updateStage("site", site.id);
-      const source = mapRef.current?.getSource("site-plan");
+
+    // Debounce so scanning down the site list does not launch a flight per row.
+    const t = window.setTimeout(() => {
+      const m = mapRef.current;
+      if (!m) return;
+      flightTarget.current = site.id;
+      const source = m.getSource("site-plan");
       if (isGeoJsonSource(source)) source.setData(sitePlanFor(site));
-      mapRef.current?.flyTo({
-        center: target,
+      m.stop();
+      m.flyTo({
+        center: [site.longitude, site.latitude],
         zoom: 12.2,
-        pitch: 64,
-        bearing: -24,
-        duration: 1600,
-        curve: 1.05,
-        padding,
+        pitch: 62,
+        bearing: -20,
+        duration: 5200,
+        curve: 1.45,
+        speed: 0.9,
+        screenSpeed: undefined,
+        easing: (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
+        padding: {
+          left: Math.min(340, Math.round(window.innerWidth * 0.28)),
+          right: Math.min(90, Math.round(window.innerWidth * 0.06)),
+          top: 90,
+          bottom: 110,
+        },
         essential: true,
       });
-      onApproach?.(site.id);
-    }, 2750);
-    return () => {
-      clearTimeout(t2);
-      clearTimeout(t3);
-    };
-  }, [hoveredId, selectedId, ready, sites, onApproach, updateStage]);
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [hoveredId, selectedId, ready, sites]);
 
   // Fly to selection
   useEffect(() => {
@@ -467,8 +476,10 @@ export function WorldMap({
     if (!map || !ready) return;
     const site = sites.find((s) => s.id === selectedId);
     if (!site) return;
+    flightTarget.current = site.id;
     updateStage("site", site.id);
-    onApproach?.(null);
+    approachedRef.current = null;
+    onApproachRef.current?.(null);
     map.stop();
     const source = map.getSource("site-plan");
     if (isGeoJsonSource(source)) source.setData(sitePlanFor(site));
@@ -477,13 +488,14 @@ export function WorldMap({
       zoom: 10.5,
       pitch: 55,
       bearing: -22,
-      curve: 1.4,
-      speed: 1,
-      duration: 2200,
+      curve: 1.45,
+      duration: 3200,
+      easing: (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
       essential: true,
       padding: { right: Math.round(window.innerWidth * 0.55), left: 0, top: 0, bottom: 0 },
     });
-  }, [selectedId, ready, sites, onApproach, updateStage]);
+  }, [selectedId, ready, sites, updateStage]);
+
 
 
   return (
