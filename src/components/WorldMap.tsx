@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ type CountryCollection = {
 
 type ViewState = { lon: number; lat: number; progress: number };
 type ProjectedPoint = { x: number; y: number; visible: boolean; shade: number };
+type TransformState = { x: number; y: number; scale: number };
 
 const RAD = Math.PI / 180;
 const HOME: [number, number] = [10, 50];
@@ -123,6 +124,40 @@ function useCountries() {
     };
   }, []);
   return countries;
+}
+
+function useSmoothTransform(target: TransformState) {
+  const currentRef = useRef<TransformState>(target);
+  const [current, setCurrent] = useState<TransformState>(target);
+
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      const previous = currentRef.current;
+      const k = 1 - Math.exp(-1.85 * dt);
+      const next = {
+        x: previous.x + (target.x - previous.x) * k,
+        y: previous.y + (target.y - previous.y) * k,
+        scale: previous.scale + (target.scale - previous.scale) * k,
+      };
+      const settled =
+        Math.abs(next.x - target.x) < 0.2 &&
+        Math.abs(next.y - target.y) < 0.2 &&
+        Math.abs(next.scale - target.scale) < 0.002;
+      currentRef.current = settled ? target : next;
+      setCurrent(currentRef.current);
+      if (!settled) raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target.x, target.y, target.scale]);
+
+  return current;
 }
 
 function Graticule() {
@@ -277,6 +312,7 @@ export function WorldMap(props: Props) {
   const scale = focus ? SITE_SCALE : 1;
   const mapX = focusPoint ? CX - focusPoint.x * scale : 0;
   const mapY = focusPoint ? CY - focusPoint.y * scale : 0;
+  const mapTransform = useSmoothTransform({ x: mapX, y: mapY, scale });
 
   useEffect(() => {
     if (!focus) {
@@ -325,11 +361,7 @@ export function WorldMap(props: Props) {
         </defs>
 
         <rect width="1000" height="1000" fill="var(--page)" />
-        <motion.g
-          animate={{ x: mapX, y: mapY, scale }}
-          transition={{ duration: focus ? 3.05 : 1.15, ease: [0.16, 1, 0.3, 1] }}
-          style={{ originX: 0, originY: 0 }}
-        >
+        <g transform={`matrix(${mapTransform.scale} 0 0 ${mapTransform.scale} ${mapTransform.x} ${mapTransform.y})`}>
           <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeOcean)" filter="url(#glow)" opacity="0.95" />
           <Graticule />
           <CountryLayer countries={countries} />
@@ -346,7 +378,7 @@ export function WorldMap(props: Props) {
             onSelect={onSelect}
             panelOpen={panelOpen}
           />
-        </motion.g>
+        </g>
       </svg>
 
       <div className="vignette pointer-events-none absolute inset-0" />
