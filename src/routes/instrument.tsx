@@ -8,7 +8,7 @@ import {
   classify,
   formatCapex,
   formatLolp,
-  headlineLolp,
+  referenceLolp,
   loadDataset,
   VERDICT_COLOR,
 } from "@/lib/offgrid-data";
@@ -77,15 +77,17 @@ function InstrumentPage() {
             <div className="border-b border-hairline px-5 py-5">
               <div className="label-xs">Candidate sites</div>
               <p className="mt-3 text-[12px] font-light leading-relaxed text-foreground/70">
-                Sorted by best achievable LOLP at 50 MW IT load — the hardest test. Second
-                figure is the cheapest build that holds 1 % outage.{" "}
+                Sorted by LOLP at one common reference build — 40 turbines · 100 MWp ·
+                800 MWh — under a 50 MW IT load. Second figure is the cheapest build that
+                holds 1 % outage.{" "}
+
                 <Link to="/guide" className="text-primary underline-offset-4 hover:underline">
                   What do these mean?
                 </Link>
               </p>
               <div className="label-xs mt-4 flex justify-between">
                 <span>Site</span>
-                <span>LOLP @ 50 MW</span>
+                <span>LOLP · ref build</span>
               </div>
             </div>
 
@@ -94,9 +96,9 @@ function InstrumentPage() {
               {isError && <div className="label-xs px-5 py-5">Dataset unavailable.</div>}
               {data?.sites
                 .slice()
-                .sort((a, b) => headlineLolp(a) - headlineLolp(b))
+                .sort((a, b) => referenceLolp(data!.grille_axes, a) - referenceLolp(data!.grille_axes, b))
                 .map((site) => {
-                  const lolp = headlineLolp(site);
+                  const lolp = referenceLolp(data!.grille_axes, site);
                   const color = VERDICT_COLOR[classify(lolp)];
                   const active = selected?.id === site.id;
 

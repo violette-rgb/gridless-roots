@@ -8,7 +8,7 @@ import {
   classify,
   formatCapex,
   formatLolp,
-  headlineLolp,
+  referenceLolp,
   loadDataset,
   VERDICT_COLOR,
 } from "@/lib/offgrid-data";
@@ -155,7 +155,7 @@ function Landing() {
         title="Eighteen locations, ranked by the hardest test we run."
       >
         <p className="-mt-8 mb-8 max-w-xl text-[13px] font-light leading-relaxed text-foreground/72">
-          Each row shows two numbers. <span className="text-primary">LOLP @ 50 MW</span> is
+          Each row shows two numbers. <span className="text-primary">LOLP · ref build</span> is
           the share of the year the site cannot power a 50 MW compute load, even with the
           largest sizing we simulate. <span className="text-primary">CAPEX ≤ 1 %</span> is
           the cheapest build that keeps outages under 1 % of the year — a dash means no
@@ -164,16 +164,16 @@ function Landing() {
         <div className="label-xs flex justify-between border-b border-hairline pb-3">
           <span>Site</span>
           <span className="flex gap-8">
-            <span className="w-28 text-right">LOLP @ 50 MW</span>
+            <span className="w-28 text-right">LOLP · ref build</span>
             <span className="hidden w-32 text-right sm:inline">CAPEX ≤ 1 % LOLP</span>
           </span>
         </div>
         <ul className="divide-y divide-hairline border-b border-hairline">
           {data?.sites
             .slice()
-            .sort((a, b) => headlineLolp(a) - headlineLolp(b))
+            .sort((a, b) => referenceLolp(data!.grille_axes, a) - referenceLolp(data!.grille_axes, b))
             .map((s) => {
-              const lolp = headlineLolp(s);
+              const lolp = referenceLolp(data!.grille_axes, s);
               const color = VERDICT_COLOR[classify(lolp)];
               return (
                 <li key={s.id}>

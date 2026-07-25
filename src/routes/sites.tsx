@@ -7,7 +7,7 @@ import { SiteDetail } from "@/components/SiteDetail";
 import {
   classify,
   formatLolp,
-  headlineLolp,
+  referenceLolp,
   loadDataset,
   VERDICT_COLOR,
   type Site,
@@ -53,6 +53,7 @@ function SitesPage() {
       {data && (
         <WorldMap
           sites={data.sites}
+          axes={data.grille_axes}
           selectedId={selected?.id ?? null}
           hoveredId={hovered}
           onHover={setHovered}
@@ -71,7 +72,7 @@ function SitesPage() {
         <div className="label-xs">Candidate sites</div>
         <p className="mt-3 max-w-[240px] text-[12px] font-light leading-relaxed text-foreground/72">
           Hover a row to swing the globe over its country. Click to open the instrument.
-          The figure is best achievable LOLP at a 50 MW IT load.
+          The figure is LOLP for a common reference build — 40 turbines, 100 MWp, 800 MWh — at 50 MW IT load, so sites are comparable.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
@@ -90,9 +91,9 @@ function SitesPage() {
         <ul className="mt-5 max-h-[52vh] space-y-px overflow-y-auto pr-1">
           {data?.sites
             .slice()
-            .sort((a, b) => headlineLolp(a) - headlineLolp(b))
+            .sort((a, b) => referenceLolp(data.grille_axes, a) - referenceLolp(data.grille_axes, b))
             .map((s) => {
-              const lolp = headlineLolp(s);
+              const lolp = referenceLolp(data!.grille_axes, s);
               const color = VERDICT_COLOR[classify(lolp)];
               const active = hovered === s.id;
               return (
