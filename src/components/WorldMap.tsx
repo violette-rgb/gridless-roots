@@ -56,8 +56,14 @@ const STYLE = {
   ],
 };
 
+type LineFeature = {
+  type: "Feature";
+  properties: Record<string, never>;
+  geometry: { type: "LineString"; coordinates: number[][] };
+};
+
 function graticule() {
-  const features: GeoJSON.Feature[] = [];
+  const features: LineFeature[] = [];
   for (let lon = -180; lon <= 180; lon += 10) {
     features.push({
       type: "Feature",
@@ -78,7 +84,7 @@ function graticule() {
       },
     });
   }
-  return { type: "FeatureCollection", features } as GeoJSON.FeatureCollection;
+  return { type: "FeatureCollection" as const, features };
 }
 
 interface Props {
@@ -119,7 +125,7 @@ export function WorldMap({
     let map: MLMap | null = null;
     let cancelled = false;
     (async () => {
-      const maplibregl = (await import("maplibre-gl")).default;
+      const maplibregl = await import("maplibre-gl");
       if (cancelled || !container.current) return;
       map = new maplibregl.Map({
         container: container.current,
@@ -131,21 +137,21 @@ export function WorldMap({
         maxPitch: 75,
       });
       mapRef.current = map;
-      map.on("load", () => {
-        if (!map) return;
-        map.addSource("graticule", { type: "geojson", data: graticule() });
-        map.addLayer({
+      const m = map;
+      m.on("load", () => {
+        m.addSource("graticule", { type: "geojson", data: graticule() });
+        m.addLayer({
           id: "graticule",
           type: "line",
           source: "graticule",
           paint: { "line-color": "#7fd6f2", "line-opacity": 0.07, "line-width": 0.5 },
         });
-        map.setTerrain({ source: "terrain", exaggeration: 1.25 });
+        m.setTerrain({ source: "terrain", exaggeration: 1.25 });
         setReady(true);
-        project(map);
+        project(m);
       });
-      map.on("move", () => map && project(map));
-      map.on("render", () => map && project(map));
+      m.on("move", () => project(m));
+      m.on("render", () => project(m));
     })();
     return () => {
       cancelled = true;
