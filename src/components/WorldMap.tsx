@@ -206,39 +206,137 @@ function CountryLayer({ countries }: { countries: CountryCollection | null }) {
   );
 }
 
-function SurveyPlan({ site }: { site: Site | null }) {
-  if (!site) return null;
+function seedNum(id: string) {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) % 100000;
+  return h;
+}
+
+/** Zoomed-in topographic site map, drawn in globe coordinates around the site. */
+function SiteTerrainPlan({ site, reveal }: { site: Site; reveal: number }) {
   const center = projectPoint(site.longitude, site.latitude, HOME_VIEW);
+  const terrain = terrainFor(site.id, site.latitude);
+  const seed = seedNum(site.id);
+  const rug = terrain.ruggedness;
+
+  const contours = useMemo(() => {
+    const rows: { d: string; index: number }[] = [];
+    for (let i = 0; i < 16; i += 1) {
+      const y = -132 + i * 17;
+      const a = Math.sin(seed * 0.017 + i * 0.7) * 16 * (0.5 + rug);
+      const b = Math.cos(seed * 0.031 + i * 0.53) * 13 * (0.5 + rug);
+      const c = Math.sin(seed * 0.011 + i * 0.9) * 10 * (0.4 + rug);
+      rows.push({
+        index: i,
+        d: `M-150 ${(y + a * 0.4).toFixed(1)} C-96 ${(y - a).toFixed(1)} -44 ${(y + b).toFixed(1)} 6 ${(y - c).toFixed(1)} C58 ${(y + b * 0.6).toFixed(1)} 106 ${(y - a * 0.7).toFixed(1)} 150 ${(y + c * 0.5).toFixed(1)}`,
+      });
+    }
+    return rows;
+  }, [seed, rug]);
+
+  const turbines = useMemo(
+    () =>
+      Array.from({ length: rug > 0.7 ? 7 : 9 }, (_, i) => {
+        const t = i / (rug > 0.7 ? 6 : 8);
+        return {
+          x: -132 + t * 264,
+          y: -104 + Math.sin(seed * 0.013 + t * 3.1) * 20 * (0.4 + rug),
+        };
+      }),
+    [seed, rug],
+  );
+
+  const panelRows = rug > 0.62 ? 3 : 5;
+
   return (
     <motion.g
-      transform={`translate(${center.x} ${center.y}) scale(0.82) rotate(-18)`}
+      transform={`translate(${center.x} ${center.y})`}
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      animate={{ opacity: reveal }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.45, ease: "easeOut" }}
+      transition={{ duration: 0.2, ease: "linear" }}
+      pointerEvents="none"
     >
-      <rect x="-58" y="-36" width="116" height="72" rx="4" fill="var(--foreground)" opacity="0.82" />
-      <rect x="-49" y="-25" width="98" height="18" rx="2" fill="var(--page)" opacity="0.78" />
-      <rect x="-49" y="4" width="98" height="18" rx="2" fill="var(--page)" opacity="0.78" />
-      {Array.from({ length: 18 }, (_, i) => {
-        const col = i % 6;
-        const row = Math.floor(i / 6);
-        return <rect key={i} x={-126 + col * 20} y={58 + row * 12} width="15" height="7" fill="var(--primary)" opacity="0.7" />;
-      })}
-      <path d="M-148 -76 C-92 -118 -42 -98 0 -126 C46 -156 94 -122 142 -148" fill="none" stroke="var(--primary)" strokeWidth="2" strokeDasharray="7 6" opacity="0.72" />
-      {[-138, -78, -14, 52, 118].map((x, index) => (
-        <g key={x} transform={`translate(${x} ${index % 2 ? -96 : -122})`}>
-          <line y1="0" y2="-28" stroke="var(--foreground)" strokeWidth="2" />
-          <circle cy="-34" r="8" fill="none" stroke="var(--foreground)" strokeWidth="2" />
-          <line x1="0" y1="-34" x2="0" y2="-47" stroke="var(--foreground)" strokeWidth="1.6" />
-          <line x1="0" y1="-34" x2="11" y2="-28" stroke="var(--foreground)" strokeWidth="1.6" />
-          <line x1="0" y1="-34" x2="-11" y2="-28" stroke="var(--foreground)" strokeWidth="1.6" />
+      {/* survey ground */}
+      <rect x="-152" y="-136" width="304" height="272" rx="3" fill="var(--muted)" opacity="0.5" />
+      {terrain.coastal && (
+        <path d="M-152 96 C-96 84 -42 112 10 100 C64 88 110 116 152 104 L152 136 L-152 136 Z" fill="var(--page)" opacity="0.9" />
+      )}
+      {contours.map(({ d, index }) => (
+        <path
+          key={index}
+          d={d}
+          fill="none"
+          stroke="var(--primary)"
+          strokeOpacity={index % 4 === 0 ? 0.5 : 0.22}
+          strokeWidth={index % 4 === 0 ? 0.9 : 0.5}
+        />
+      ))}
+
+      {/* access road */}
+      <path
+        d={`M-152 ${(40 + (seed % 17)).toFixed(0)} C-80 ${(20 + (seed % 11)).toFixed(0)} -30 60 8 44 C48 27 96 40 152 18`}
+        fill="none"
+        stroke="var(--foreground)"
+        strokeOpacity="0.4"
+        strokeWidth="1.6"
+        strokeDasharray="6 4"
+      />
+
+      {/* turbine array on the exposed ridge */}
+      {turbines.map((t, i) => (
+        <g key={i} transform={`translate(${t.x.toFixed(1)} ${t.y.toFixed(1)})`}>
+          <circle r="13" fill="none" stroke="var(--primary)" strokeOpacity="0.28" strokeWidth="0.5" />
+          <line y1="0" y2="-9" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.9" />
+          <line x1="0" y1="-9" x2="0" y2="-16" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
+          <line x1="0" y1="-9" x2="6.5" y2="-5" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
+          <line x1="0" y1="-9" x2="-6.5" y2="-5" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
         </g>
       ))}
-      <rect x="-165" y="-165" width="330" height="330" fill="none" stroke="var(--primary)" strokeWidth="1.4" strokeDasharray="5 8" opacity="0.32" />
+
+      {/* PV field on the gentle south-facing slope */}
+      <g transform="translate(-134 46)">
+        {Array.from({ length: panelRows * 10 }, (_, i) => (
+          <rect
+            key={i}
+            x={(i % 10) * 9.4}
+            y={Math.floor(i / 10) * 7.4}
+            width="7"
+            height="4.2"
+            fill="var(--primary)"
+            opacity="0.6"
+          />
+        ))}
+      </g>
+
+      {/* data halls on the graded pad */}
+      <g transform="translate(56 62)">
+        <rect x="-42" y="-20" width="84" height="42" rx="1.5" fill="var(--foreground)" opacity="0.16" />
+        {[0, 1, 2].map((i) => (
+          <rect key={i} x={-36 + i * 25} y="-14" width="21" height="30" fill="var(--foreground)" opacity="0.78" />
+        ))}
+        <rect x="-36" y="20" width="72" height="3" fill="var(--primary)" opacity="0.5" />
+      </g>
+
+      {/* survey frame, scale bar, north arrow */}
+      <rect x="-152" y="-136" width="304" height="272" fill="none" stroke="var(--primary)" strokeOpacity="0.4" strokeWidth="0.8" strokeDasharray="4 5" />
+      <g transform="translate(-144 126)">
+        <line x1="0" y1="0" x2="48" y2="0" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
+        <line x1="0" y1="-3" x2="0" y2="3" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
+        <line x1="48" y1="-3" x2="48" y2="3" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
+        <text x="0" y="-5" fill="var(--foreground)" fillOpacity="0.65" fontSize="6" letterSpacing="0.6">1 km</text>
+      </g>
+      <g transform="translate(138 -122)">
+        <path d="M0 -10 L4 6 L0 2 L-4 6 Z" fill="var(--primary)" opacity="0.8" />
+        <text x="-2.6" y="16" fill="var(--foreground)" fillOpacity="0.6" fontSize="6.5">N</text>
+      </g>
+      <text x="-150" y="-142" fill="var(--foreground)" fillOpacity="0.55" fontSize="6.5" letterSpacing="1">
+        {site.nom.toUpperCase()} · 6 KM SURVEY · {terrain.landform.replace("-", " ").toUpperCase()} · {terrain.relief} M RELIEF
+      </text>
     </motion.g>
   );
 }
+
 
 function MarkerLayer({
   sites,
