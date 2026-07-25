@@ -125,7 +125,7 @@ export function WorldMap({
     if (!map || !ready) return;
     const site = sites.find((s) => s.id === selectedId);
     if (!site) {
-      map.easeTo({ center: [4, 52], zoom: 2.9, pitch: 0, bearing: 0, duration: 1600, padding: { left: 0, right: 0 } });
+      map.easeTo({ center: [10, 55], zoom: 3.2, pitch: 0, bearing: 0, duration: 1600, padding: { left: 0, right: 0 } });
       return;
     }
     map.flyTo({
