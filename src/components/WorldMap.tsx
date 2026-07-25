@@ -546,29 +546,27 @@ export function WorldMap({
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {sites.map((site, i) => {
-          const pos = positions[site.id];
-          if (!pos) return null;
-          if (angularDistance(center, [site.longitude, site.latitude]) > 78) return null;
-
           const lolp = referenceLolp(axes, site);
           const color = VERDICT_COLOR[siteVerdict(site)];
           const isHovered = hoveredId === site.id;
           const isSelected = selectedId === site.id;
           const dimmed = (hoveredId && !isHovered) || (panelOpen && !isSelected);
-          const flip = pos.x > window.innerWidth * 0.6;
+          const flip = false;
 
           return (
             <div
               key={site.id}
-              className="pointer-events-auto absolute flex h-11 w-11 items-center justify-center"
+              ref={(el) => {
+                markerRefs.current[site.id] = el;
+              }}
+              className="pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center will-change-transform"
               style={{
-                left: pos.x,
-                top: pos.y,
-                transform: "translate(-50%, -50%)",
                 opacity: dimmed ? 0.28 : 1,
+                visibility: "hidden",
                 transition: "opacity 300ms ease",
                 zIndex: isHovered ? 30 : 10,
               }}
+
               onPointerEnter={() => onHover(site.id)}
               onFocus={() => onHover(site.id)}
               onClick={() => {
