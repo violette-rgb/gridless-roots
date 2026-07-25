@@ -3,10 +3,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  referenceLolp,
   type GrilleAxes,
   siteVerdict,
-  formatLolp,
   VERDICT_COLOR,
   type Site,
 } from "@/lib/offgrid-data";
@@ -44,6 +42,7 @@ type CountryCollection = {
 
 type ViewState = { lon: number; lat: number; progress: number };
 type ProjectedPoint = { x: number; y: number; visible: boolean; shade: number };
+type TransformState = { x: number; y: number; scale: number };
 
 const RAD = Math.PI / 180;
 const HOME: [number, number] = [10, 50];
@@ -51,26 +50,11 @@ const SVG_SIZE = 1000;
 const CX = 520;
 const CY = 500;
 const HOME_R = 286;
-
-function shortestLon(current: number, target: number) {
-  const delta = ((target - current + 540) % 360) - 180;
-  return current + (Number.isNaN(delta) ? 0 : delta);
-}
-
-function stageFromProgress(progress: number, siteId: string | null): ZoomStage {
-  if (!siteId || progress < 0.12) return "globe";
-  if (progress < 0.46) return "country";
-  if (progress < 0.78) return "city";
-  return "site";
-}
-
-function radiusFor(progress: number) {
-  const eased = progress * progress * (3 - 2 * progress);
-  return HOME_R + eased * 1120;
-}
+const HOME_VIEW: ViewState = { lon: HOME[0], lat: HOME[1], progress: 0 };
+const SITE_SCALE = 4.25;
 
 function projectPoint(lon: number, lat: number, view: ViewState): ProjectedPoint {
-  const radius = radiusFor(view.progress);
+  const radius = HOME_R;
   const lambda = (lon - view.lon) * RAD;
   const phi = lat * RAD;
   const phi0 = view.lat * RAD;
@@ -98,7 +82,7 @@ function ringPath(ring: number[][], view: ViewState) {
     open = true;
     points += 1;
   }
-  if (points > 2 && view.progress < 0.72) parts.push("Z");
+  if (points > 2) parts.push("Z");
   return parts.join(" ");
 }
 
@@ -142,85 +126,97 @@ function useCountries() {
   return countries;
 }
 
-function useAnimatedView(sites: Site[], hoveredId: string | null, selectedId: string | null) {
-  const focusId = selectedId ?? hoveredId;
-  const focus = focusId ? sites.find((site) => site.id === focusId) ?? null : null;
-  const target = focus ? { lon: focus.longitude, lat: focus.latitude, progress: 1 } : { lon: HOME[0], lat: HOME[1], progress: 0 };
-  const viewRef = useRef<ViewState>({ lon: HOME[0], lat: HOME[1], progress: 0 });
-  const [view, setView] = useState<ViewState>(viewRef.current);
+function useSmoothTransform(target: TransformState) {
+  const currentRef = useRef<TransformState>(target);
+  const [current, setCurrent] = useState<TransformState>(target);
 
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
+
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      const current = viewRef.current;
-      const lonTarget = shortestLon(current.lon, target.lon);
-      const k = 1 - Math.exp(-(target.progress > current.progress ? 1.55 : 2.35) * dt);
+      const previous = currentRef.current;
+      const k = 1 - Math.exp(-1.85 * dt);
       const next = {
-        lon: current.lon + (lonTarget - current.lon) * k,
-        lat: current.lat + (target.lat - current.lat) * k,
-        progress: current.progress + (target.progress - current.progress) * k,
+        x: previous.x + (target.x - previous.x) * k,
+        y: previous.y + (target.y - previous.y) * k,
+        scale: previous.scale + (target.scale - previous.scale) * k,
       };
-      viewRef.current = next;
-      setView(next);
-      raf = requestAnimationFrame(tick);
+      const settled =
+        Math.abs(next.x - target.x) < 0.2 &&
+        Math.abs(next.y - target.y) < 0.2 &&
+        Math.abs(next.scale - target.scale) < 0.002;
+      currentRef.current = settled ? target : next;
+      setCurrent(currentRef.current);
+      if (!settled) raf = requestAnimationFrame(tick);
     };
+
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [target.lat, target.lon, target.progress]);
+  }, [target.x, target.y, target.scale]);
 
-  return { view, focus };
+  return current;
 }
 
-function Graticule({ view }: { view: ViewState }) {
-  const lines = useMemo(() => {
+function Graticule() {
+  const paths = useMemo(() => {
     const result: [number, number][][] = [];
     for (let lon = -180; lon <= 180; lon += 15) result.push(Array.from({ length: 73 }, (_, i) => [lon, -90 + i * 2.5] as [number, number]));
     for (let lat = -75; lat <= 75; lat += 15) result.push(Array.from({ length: 145 }, (_, i) => [-180 + i * 2.5, lat] as [number, number]));
-    return result;
+    return result.map((line) => sampledLinePath(line, HOME_VIEW)).filter(Boolean);
   }, []);
   return (
-    <g opacity={Math.max(0.04, 0.16 - view.progress * 0.09)}>
-      {lines.map((line, index) => {
-        const d = sampledLinePath(line, view);
-        return d ? <path key={index} d={d} fill="none" stroke="var(--primary)" strokeWidth={0.9} /> : null;
-      })}
+    <g opacity="0.13">
+      {paths.map((d, index) => (
+        <path key={index} d={d} fill="none" stroke="var(--primary)" strokeWidth={0.9} vectorEffect="non-scaling-stroke" />
+      ))}
     </g>
   );
 }
 
-function CountryLayer({ countries, view }: { countries: CountryCollection | null; view: ViewState }) {
+function CountryLayer({ countries }: { countries: CountryCollection | null }) {
+  const paths = useMemo(
+    () =>
+      (countries?.features ?? [])
+        .map((feature, index) => ({
+          id: `${feature.properties.name ?? "country"}-${index}`,
+          d: geometryPath(feature.geometry, HOME_VIEW),
+        }))
+        .filter((item) => item.d),
+    [countries],
+  );
+
   return (
     <g>
-      {(countries?.features ?? []).map((feature, index) => {
-        const d = geometryPath(feature.geometry, view);
-        if (!d) return null;
-        return (
-          <path
-            key={`${feature.properties.name ?? "country"}-${index}`}
-            d={d}
-            fill="var(--muted)"
-            fillOpacity={view.progress > 0.7 ? 0.22 : 0.74}
-            stroke="var(--foreground)"
-            strokeOpacity={view.progress > 0.72 ? 0.42 : 0.3}
-            strokeWidth={view.progress > 0.75 ? 1.05 : 0.7}
-            vectorEffect="non-scaling-stroke"
-          />
-        );
-      })}
+      {paths.map(({ id, d }) => (
+        <path
+          key={id}
+          d={d}
+          fill="var(--muted)"
+          fillOpacity="0.72"
+          stroke="var(--foreground)"
+          strokeOpacity="0.34"
+          strokeWidth="0.8"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
     </g>
   );
 }
 
-function SurveyPlan({ view, site }: { view: ViewState; site: Site | null }) {
-  if (!site || view.progress < 0.73) return null;
-  const center = projectPoint(site.longitude, site.latitude, view);
-  const opacity = Math.min(1, (view.progress - 0.73) / 0.18);
-  const scale = 0.72 + view.progress * 0.42;
+function SurveyPlan({ site }: { site: Site | null }) {
+  if (!site) return null;
+  const center = projectPoint(site.longitude, site.latitude, HOME_VIEW);
   return (
-    <g transform={`translate(${center.x} ${center.y}) scale(${scale}) rotate(-18)`} opacity={opacity}>
+    <motion.g
+      transform={`translate(${center.x} ${center.y}) scale(0.82) rotate(-18)`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.45, ease: "easeOut" }}
+    >
       <rect x="-58" y="-36" width="116" height="72" rx="4" fill="var(--foreground)" opacity="0.82" />
       <rect x="-49" y="-25" width="98" height="18" rx="2" fill="var(--page)" opacity="0.78" />
       <rect x="-49" y="4" width="98" height="18" rx="2" fill="var(--page)" opacity="0.78" />
@@ -240,34 +236,33 @@ function SurveyPlan({ view, site }: { view: ViewState; site: Site | null }) {
         </g>
       ))}
       <rect x="-165" y="-165" width="330" height="330" fill="none" stroke="var(--primary)" strokeWidth="1.4" strokeDasharray="5 8" opacity="0.32" />
-    </g>
+    </motion.g>
   );
 }
 
 function MarkerLayer({
   sites,
-  axes,
-  view,
   hoveredId,
   selectedId,
   approachedId,
   onHover,
   onSelect,
   panelOpen,
-}: Pick<Props, "sites" | "axes" | "hoveredId" | "selectedId" | "approachedId" | "onHover" | "onSelect" | "panelOpen"> & { view: ViewState }) {
+}: Pick<Props, "sites" | "hoveredId" | "selectedId" | "approachedId" | "onHover" | "onSelect" | "panelOpen">) {
+  const focusId = selectedId ?? hoveredId;
   return (
     <g>
       {sites.map((site) => {
-        const p = projectPoint(site.longitude, site.latitude, view);
+        const p = projectPoint(site.longitude, site.latitude, HOME_VIEW);
         if (!p.visible) return null;
-        const lolp = referenceLolp(axes, site);
         const color = VERDICT_COLOR[siteVerdict(site)];
         const isHovered = hoveredId === site.id;
         const isSelected = selectedId === site.id;
-        const dimmed = Boolean((hoveredId && !isHovered) || (panelOpen && !isSelected));
+        const isFocus = focusId === site.id;
+        const dimmed = Boolean((focusId && !isFocus) || (panelOpen && !isSelected));
         const r = isHovered || isSelected ? 10 : 6;
         return (
-          <g key={site.id} opacity={dimmed ? 0.35 : 1}>
+          <g key={site.id} opacity={dimmed ? 0.18 : 1} pointerEvents={focusId && !isFocus ? "none" : "auto"}>
             <circle cx={p.x} cy={p.y} r={r * 3.1} fill={color} opacity={isHovered ? 0.16 : 0.07} />
             <circle cx={p.x} cy={p.y} r={r * 1.7} fill="none" stroke={color} strokeOpacity="0.42" strokeWidth="1.4" />
             <circle
@@ -277,8 +272,10 @@ function MarkerLayer({
               fill={color}
               stroke="var(--page)"
               strokeWidth="2.5"
-              className="cursor-pointer transition-opacity"
-              onPointerEnter={() => onHover(site.id)}
+              className="cursor-pointer"
+              onPointerEnter={() => {
+                if (!focusId || isFocus) onHover(site.id);
+              }}
               onClick={() => {
                 onHover(site.id);
                 onSelect(site);
@@ -290,26 +287,15 @@ function MarkerLayer({
               r="24"
               fill="transparent"
               className="cursor-pointer"
-              onPointerEnter={() => onHover(site.id)}
+              onPointerEnter={() => {
+                if (!focusId || isFocus) onHover(site.id);
+              }}
               onClick={() => {
                 onHover(site.id);
                 onSelect(site);
               }}
             />
-            {isHovered && approachedId !== site.id && (
-              <foreignObject x={Math.min(780, p.x + 22)} y={Math.max(130, p.y - 52)} width="230" height="110" className="pointer-events-none overflow-visible">
-                <div className="panel whitespace-nowrap px-4 py-2.5 shadow-2xl">
-                  <div className="label-xs">{site.nom} · {site.pays}</div>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <span className="num text-3xl font-extralight leading-none" style={{ color }}>
-                      {formatLolp(lolp)}
-                    </span>
-                    <span className="text-xs opacity-65">% LOLP</span>
-                  </div>
-                  <div className="label-xs mt-1">reference build · 50 MW</div>
-                </div>
-              </foreignObject>
-            )}
+            {isHovered && approachedId !== site.id && <circle cx={p.x} cy={p.y} r="34" fill="none" stroke={color} strokeOpacity="0.28" strokeWidth="1.2" />}
           </g>
         );
       })}
@@ -318,25 +304,32 @@ function MarkerLayer({
 }
 
 export function WorldMap(props: Props) {
-  const { sites, axes, selectedId, hoveredId, approachedId, onHover, onSelect, panelOpen, onApproach, onZoomStageChange } = props;
+  const { sites, selectedId, hoveredId, approachedId, onHover, onSelect, panelOpen, onApproach, onZoomStageChange } = props;
   const countries = useCountries();
-  const { view, focus } = useAnimatedView(sites, hoveredId, selectedId);
-  const lastStage = useRef<ZoomStage>("globe");
-  const lastApproach = useRef<string | null>(null);
-  const globeRadius = radiusFor(view.progress);
+  const focusId = selectedId ?? hoveredId;
+  const focus = focusId ? sites.find((site) => site.id === focusId) ?? null : null;
+  const focusPoint = focus ? projectPoint(focus.longitude, focus.latitude, HOME_VIEW) : null;
+  const scale = focus ? SITE_SCALE : 1;
+  const mapX = focusPoint ? CX - focusPoint.x * scale : 0;
+  const mapY = focusPoint ? CY - focusPoint.y * scale : 0;
+  const mapTransform = useSmoothTransform({ x: mapX, y: mapY, scale });
 
   useEffect(() => {
-    const stage = stageFromProgress(view.progress, focus?.id ?? null);
-    if (stage !== lastStage.current) {
-      lastStage.current = stage;
-      onZoomStageChange?.(stage, focus?.id ?? null);
+    if (!focus) {
+      onApproach?.(null);
+      onZoomStageChange?.("globe", null);
+      return;
     }
-    const approach = stage === "site" ? focus?.id ?? null : null;
-    if (approach !== lastApproach.current) {
-      lastApproach.current = approach;
-      onApproach?.(approach);
-    }
-  }, [focus?.id, onApproach, onZoomStageChange, view.progress]);
+
+    onApproach?.(null);
+    onZoomStageChange?.("country", focus.id);
+    const timers = [
+      window.setTimeout(() => onZoomStageChange?.("city", focus.id), 950),
+      window.setTimeout(() => onZoomStageChange?.("site", focus.id), 1950),
+      window.setTimeout(() => onApproach?.(focus.id), 2850),
+    ];
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [focus, onApproach, onZoomStageChange]);
 
   const resetToGlobe = useCallback(() => {
     onHover(null);
@@ -365,32 +358,27 @@ export function WorldMap(props: Props) {
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <clipPath id="globeClip">
-            <circle cx={CX} cy={CY} r={Math.min(globeRadius, 760)} />
-          </clipPath>
         </defs>
 
         <rect width="1000" height="1000" fill="var(--page)" />
-        <circle cx={CX} cy={CY} r={Math.min(globeRadius, 760)} fill="url(#globeOcean)" filter="url(#glow)" opacity="0.95" />
-        <g clipPath="url(#globeClip)">
-          <Graticule view={view} />
-          <CountryLayer countries={countries} view={view} />
-          <SurveyPlan view={view} site={focus} />
-          <rect x="0" y="0" width="1000" height="1000" fill="url(#globeShade)" pointerEvents="none" />
-        </g>
-        <circle cx={CX} cy={CY} r={Math.min(globeRadius, 760)} fill="none" stroke="var(--primary)" strokeOpacity={0.22 - Math.min(view.progress * 0.18, 0.18)} strokeWidth="1.4" />
+        <g transform={`matrix(${mapTransform.scale} 0 0 ${mapTransform.scale} ${mapTransform.x} ${mapTransform.y})`}>
+          <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeOcean)" filter="url(#glow)" opacity="0.95" />
+          <Graticule />
+          <CountryLayer countries={countries} />
+          <AnimatePresence>{focus && <SurveyPlan key={focus.id} site={focus} />}</AnimatePresence>
+          <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
+          <circle cx={CX} cy={CY} r={HOME_R} fill="none" stroke="var(--primary)" strokeOpacity="0.2" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
 
-        <MarkerLayer
-          sites={sites}
-          axes={axes}
-          view={view}
-          hoveredId={hoveredId}
-          selectedId={selectedId}
-          approachedId={approachedId}
-          onHover={onHover}
-          onSelect={onSelect}
-          panelOpen={panelOpen}
-        />
+          <MarkerLayer
+            sites={sites}
+            hoveredId={hoveredId}
+            selectedId={selectedId}
+            approachedId={approachedId}
+            onHover={onHover}
+            onSelect={onSelect}
+            panelOpen={panelOpen}
+          />
+        </g>
       </svg>
 
       <div className="vignette pointer-events-none absolute inset-0" />
