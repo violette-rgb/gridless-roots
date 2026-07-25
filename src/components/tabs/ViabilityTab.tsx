@@ -268,9 +268,9 @@ function Sweep({
 
   return (
     <div className="rounded-xl border border-hairline px-5 py-4">
-      <div className="flex items-baseline justify-between">
-        <span className="label-xs">{title}</span>
-        <span className="label-xs opacity-50">{note}</span>
+      <div>
+        <div className="label-xs">{title}</div>
+        <div className="label-xs mt-1 opacity-40">{note}</div>
       </div>
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="mt-4 h-24 w-full">
         <path
