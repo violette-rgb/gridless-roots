@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { SiteFooter } from "@/components/SiteNav";
+import { HeroGlobe } from "@/components/HeroGlobe";
 import {
   bestLolp,
   classify,
@@ -49,14 +50,7 @@ function Landing() {
     <main className="min-h-screen bg-[#07090c]">
       {/* Hero */}
       <section className="relative flex min-h-screen items-center overflow-hidden px-6 md:px-10">
-        <div
-          className="pointer-events-none absolute -right-1/4 top-1/2 h-[820px] w-[820px] -translate-y-1/2 rounded-full opacity-60 blur-[2px]"
-          style={{
-            background:
-              "radial-gradient(circle at 35% 35%, oklch(0.32 0.06 220 / 55%), oklch(0.14 0.02 240 / 85%) 58%, transparent 70%)",
-            boxShadow: "0 0 240px 40px oklch(0.5 0.12 210 / 12%)",
-          }}
-        />
+        {hydrated && <HeroGlobe />}
         <div className="vignette pointer-events-none absolute inset-0" />
 
         <motion.div
