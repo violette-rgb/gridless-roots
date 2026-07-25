@@ -68,49 +68,62 @@ function SitesPage() {
         className="absolute left-6 top-28 z-30 w-[260px] md:left-10"
       >
         <div className="label-xs">Candidate sites</div>
-        <p className="mt-3 max-w-[240px] text-[12px] font-light leading-relaxed text-foreground/70">
+        <p className="mt-3 max-w-[240px] text-[12px] font-light leading-relaxed text-foreground/72">
           Hover a row to swing the globe over its country. Click to open the instrument.
+          The figure is best achievable LOLP at a 50 MW IT load.
         </p>
-        <button
-          onClick={() => data?.sites[0] && setSelected(data.sites[0])}
-          className="mt-4 rounded-full border border-primary/40 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors duration-200 hover:bg-primary/10"
-        >
-          Open instrument
-        </button>
-        <ul className="mt-5 space-y-px">
-          {data?.sites.map((s) => {
-            const lolp = bestLolp(s);
-            const color = VERDICT_COLOR[classify(lolp)];
-            const active = hovered === s.id;
-            return (
-              <li key={s.id}>
-                <button
-                  onMouseEnter={() => setHovered(s.id)}
-                  onMouseLeave={() => setHovered(null)}
-                  onClick={() => setSelected(s)}
-                  className={`group flex w-full items-baseline justify-between border-b border-hairline py-2.5 text-left transition-opacity duration-200 ${
-                    active ? "opacity-100" : "opacity-75 hover:opacity-90"
-                  }`}
-                >
-                  <span className="flex items-baseline gap-2.5">
-                    <span
-                      className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{
-                        background: color,
-                        boxShadow: active ? `0 0 12px ${color}` : "none",
-                      }}
-                    />
-                    <span className="text-[13px] font-light">{s.nom}</span>
-                    <span className="label-xs">{s.pays}</span>
-                  </span>
-                  <span className="num text-[12px]" style={{ color }}>
-                    {formatLolp(lolp)}%
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={() => data?.sites[0] && setSelected(data.sites[0])}
+            className="rounded-full border border-primary/40 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors duration-200 hover:bg-primary/10"
+          >
+            Open instrument
+          </button>
+          <Link
+            to="/guide"
+            className="rounded-full border border-hairline px-4 py-2 text-[11px] uppercase tracking-[0.16em] opacity-75 transition-opacity hover:opacity-100"
+          >
+            Guide
+          </Link>
+        </div>
+        <ul className="mt-5 max-h-[52vh] space-y-px overflow-y-auto pr-1">
+          {data?.sites
+            .slice()
+            .sort((a, b) => headlineLolp(a) - headlineLolp(b))
+            .map((s) => {
+              const lolp = headlineLolp(s);
+              const color = VERDICT_COLOR[classify(lolp)];
+              const active = hovered === s.id;
+              return (
+                <li key={s.id}>
+                  <button
+                    onMouseEnter={() => setHovered(s.id)}
+                    onMouseLeave={() => setHovered(null)}
+                    onClick={() => setSelected(s)}
+                    className={`group flex w-full items-baseline justify-between border-b border-hairline py-2.5 text-left transition-opacity duration-200 ${
+                      active ? "opacity-100" : "opacity-75 hover:opacity-95"
+                    }`}
+                  >
+                    <span className="flex items-baseline gap-2.5">
+                      <span
+                        className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{
+                          background: color,
+                          boxShadow: active ? `0 0 12px ${color}` : "none",
+                        }}
+                      />
+                      <span className="text-[13px] font-light">{s.nom}</span>
+                      <span className="label-xs">{s.pays}</span>
+                    </span>
+                    <span className="num text-[12px]" style={{ color }}>
+                      {formatLolp(lolp)}%
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
         </ul>
+
         {!data && !isError && <p className="label-xs mt-6">Loading 8 sites…</p>}
         {isError && <p className="label-xs mt-6">Dataset unavailable.</p>}
       </motion.aside>
