@@ -37,6 +37,12 @@ type PlanFeature = {
 
 const emptyPlan = { type: "FeatureCollection" as const, features: [] as PlanFeature[] };
 
+type GeoJsonSourceLike = { setData: (data: typeof emptyPlan) => void };
+
+function isGeoJsonSource(source: unknown): source is GeoJsonSourceLike {
+  return typeof source === "object" && source !== null && "setData" in source;
+}
+
 function graticule() {
   const features: LineFeature[] = [];
   for (let lon = -180; lon <= 180; lon += 10) {
@@ -436,7 +442,7 @@ export function WorldMap({
       if (descentRef.current !== descent) return;
       updateStage("site", site.id);
       const source = mapRef.current?.getSource("site-plan");
-      if (source && "setData" in source) source.setData(sitePlanFor(site));
+      if (isGeoJsonSource(source)) source.setData(sitePlanFor(site));
       mapRef.current?.flyTo({
         center: target,
         zoom: 12.2,
@@ -465,7 +471,7 @@ export function WorldMap({
     onApproach?.(null);
     map.stop();
     const source = map.getSource("site-plan");
-    if (source && "setData" in source) source.setData(sitePlanFor(site));
+    if (isGeoJsonSource(source)) source.setData(sitePlanFor(site));
     map.flyTo({
       center: [site.longitude, site.latitude],
       zoom: 10.5,
