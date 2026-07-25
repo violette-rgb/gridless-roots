@@ -129,7 +129,8 @@ export function WorldMap({
         // it. Push them apart so continents read clearly on the globe.
         const paint = (id: string, prop: string, value: string | number) => {
           try {
-            if (m.getLayer(id)) m.setPaintProperty(id, prop, value);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (m.getLayer(id)) (m as any).setPaintProperty(id, prop, value);
           } catch {
             /* layer does not support this paint property */
           }
