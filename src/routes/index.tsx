@@ -49,7 +49,7 @@ function Landing() {
   });
 
   return (
-    <main className="min-h-screen bg-[#07090c]">
+    <main className="min-h-screen bg-page">
       {/* Hero */}
       <section className="relative flex min-h-screen items-center overflow-hidden px-6 md:px-10">
         {hydrated && <HeroGlobe />}
@@ -74,7 +74,7 @@ function Landing() {
           </motion.h1>
           <motion.p
             variants={fade}
-            className="mt-8 max-w-lg text-[15px] font-light leading-relaxed text-foreground/55"
+            className="mt-8 max-w-lg text-[15px] font-light leading-relaxed text-foreground/75"
           >
             A grid connection in Europe takes seven to ten years. We simulate eight
             candidate sites hour by hour across a full meteorological year and answer one
@@ -187,7 +187,7 @@ function Landing() {
             <h3 className="text-2xl font-extralight tracking-tight md:text-3xl">
               Open the instrument.
             </h3>
-            <p className="mt-2 max-w-md text-[13px] font-light text-foreground/50">
+            <p className="mt-2 max-w-md text-[13px] font-light text-foreground/72">
               Rotate the globe, hover a site, dial turbines, solar and storage — and watch
               the loss-of-load probability move in real time.
             </p>
@@ -242,7 +242,7 @@ function Card({ n, t, d }: { n: string; t: string; d: string }) {
     <div className="border-t border-hairline pt-5">
       <div className="num label-xs text-primary opacity-100">{n}</div>
       <h3 className="mt-4 text-lg font-light tracking-tight">{t}</h3>
-      <p className="mt-3 text-[13px] font-light leading-relaxed text-foreground/50">{d}</p>
+      <p className="mt-3 text-[13px] font-light leading-relaxed text-foreground/72">{d}</p>
     </div>
   );
 }

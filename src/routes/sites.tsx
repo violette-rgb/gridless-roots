@@ -48,7 +48,7 @@ function SitesPage() {
   const [selected, setSelected] = useState<Site | null>(null);
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-[#07090c]">
+    <main className="relative h-screen w-screen overflow-hidden bg-page">
       {data && (
         <WorldMap
           sites={data.sites}
@@ -68,7 +68,7 @@ function SitesPage() {
         className="absolute left-6 top-28 z-30 w-[260px] md:left-10"
       >
         <div className="label-xs">Candidate sites</div>
-        <p className="mt-3 max-w-[240px] text-[12px] font-light leading-relaxed text-foreground/45">
+        <p className="mt-3 max-w-[240px] text-[12px] font-light leading-relaxed text-foreground/70">
           Hover a row to swing the globe over its country. Click to open the instrument.
         </p>
         <button
@@ -89,7 +89,7 @@ function SitesPage() {
                   onMouseLeave={() => setHovered(null)}
                   onClick={() => setSelected(s)}
                   className={`group flex w-full items-baseline justify-between border-b border-hairline py-2.5 text-left transition-opacity duration-200 ${
-                    active ? "opacity-100" : "opacity-55 hover:opacity-90"
+                    active ? "opacity-100" : "opacity-75 hover:opacity-90"
                   }`}
                 >
                   <span className="flex items-baseline gap-2.5">

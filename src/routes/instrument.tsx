@@ -50,7 +50,7 @@ function InstrumentPage() {
   }, [data, selectedId]);
 
   return (
-    <main className="min-h-screen bg-[#07090c]">
+    <main className="min-h-screen bg-page">
       <section className="px-6 pb-8 pt-28 md:px-10">
         <div className="mx-auto flex max-w-[1400px] items-end justify-between gap-6 border-b border-hairline pb-8">
           <div>
@@ -73,7 +73,7 @@ function InstrumentPage() {
           <aside className="panel overflow-hidden">
             <div className="border-b border-hairline px-5 py-5">
               <div className="label-xs">Candidate sites</div>
-              <p className="mt-3 text-[12px] font-light leading-relaxed text-foreground/45">
+              <p className="mt-3 text-[12px] font-light leading-relaxed text-foreground/70">
                 Select a site; the instrument stays open with viability, profile, physics
                 and concept tabs ready.
               </p>

@@ -68,7 +68,7 @@ export function ViabilityTab({
               className={`num rounded-full border px-4 py-1.5 text-sm font-light transition-all duration-200 ${
                 v === pIt
                   ? "border-primary/60 bg-primary/10 text-primary"
-                  : "border-hairline text-foreground/45 hover:text-foreground/80"
+                  : "border-hairline text-foreground/70 hover:text-foreground/80"
               }`}
             >
               {v} MW
@@ -110,7 +110,7 @@ export function ViabilityTab({
             >
               {display}
             </span>
-            <span className="ml-2 text-2xl font-extralight opacity-35">%</span>
+            <span className="ml-2 text-2xl font-extralight opacity-60">%</span>
           </div>
         </div>
       </div>
@@ -208,7 +208,7 @@ export function ViabilityTab({
               <div className="num mt-1.5 text-lg font-light">
                 {f.capex === null ? "—" : `€${f.capex.toFixed(0)} M`}
               </div>
-              <div className="num mt-1 text-[11px] font-light opacity-40">
+              <div className="num mt-1 text-[11px] font-light opacity-65">
                 {f.sizing ?? "unreachable"}
               </div>
             </div>
@@ -270,7 +270,7 @@ function Sweep({
     <div className="rounded-xl border border-hairline px-5 py-4">
       <div>
         <div className="label-xs">{title}</div>
-        <div className="label-xs mt-1 opacity-40">{note}</div>
+        <div className="label-xs mt-1 opacity-65">{note}</div>
       </div>
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="mt-4 h-24 w-full">
         <path
@@ -300,7 +300,7 @@ function Sweep({
           />
         )}
       </svg>
-      <div className="num mt-2 flex justify-between text-[11px] font-light opacity-40">
+      <div className="num mt-2 flex justify-between text-[11px] font-light opacity-65">
         <span>
           {data[0].x} {unit}
         </span>

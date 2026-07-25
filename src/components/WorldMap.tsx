@@ -268,7 +268,7 @@ export function WorldMap({
                         >
                           {formatLolp(lolp)}
                         </span>
-                        <span className="text-xs opacity-40">% LOLP</span>
+                        <span className="text-xs opacity-65">% LOLP</span>
                       </div>
                       <div className="label-xs mt-1">best achievable</div>
                     </div>

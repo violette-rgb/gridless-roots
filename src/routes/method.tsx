@@ -26,14 +26,14 @@ export const Route = createFileRoute("/method")({
 
 function MethodPage() {
   return (
-    <main className="min-h-screen bg-[#07090c]">
+    <main className="min-h-screen bg-page">
       <section className="px-6 pb-16 pt-40 md:px-10">
         <div className="mx-auto max-w-[1400px]">
           <div className="label-xs">Method</div>
           <h1 className="mt-4 max-w-3xl text-[clamp(2.2rem,5vw,4rem)] font-extralight leading-[1.02] tracking-[-0.03em]">
             Four equations decide whether a site can power itself.
           </h1>
-          <p className="mt-8 max-w-xl text-[15px] font-light leading-relaxed text-foreground/55">
+          <p className="mt-8 max-w-xl text-[15px] font-light leading-relaxed text-foreground/75">
             Every site is simulated hour by hour over a full ERA5 meteorological year. No
             capacity factors, no annual averages — the battery either holds through the
             January calm or it does not.
@@ -81,7 +81,7 @@ function Item({ t, d }: { t: string; d: string }) {
   return (
     <div className="border-t border-hairline pt-5">
       <h3 className="text-lg font-light tracking-tight">{t}</h3>
-      <p className="mt-3 text-[13px] font-light leading-relaxed text-foreground/50">{d}</p>
+      <p className="mt-3 text-[13px] font-light leading-relaxed text-foreground/72">{d}</p>
     </div>
   );
 }
