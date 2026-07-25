@@ -6,6 +6,7 @@ import { terrainFor } from "@/lib/terrain";
 import SiteConcept from "@/components/tabs/SiteConcept";
 import { WorldMap } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
+import { Button } from "@/components/ui/button";
 import {
   siteVerdict,
   formatLolp,
@@ -51,6 +52,11 @@ function SitesPage() {
   const [selected, setSelected] = useState<Site | null>(null);
   const [approached, setApproached] = useState<string | null>(null);
   const onApproach = useCallback((id: string | null) => setApproached(id), []);
+  const returnToGlobe = useCallback(() => {
+    setHovered(null);
+    setApproached(null);
+    setSelected(null);
+  }, []);
   const maquette =
     !selected && approached && approached === hovered
       ? (data?.sites.find((s) => s.id === approached) ?? null)
@@ -85,12 +91,24 @@ function SitesPage() {
           The figure is LOLP for a common reference build — 40 turbines, 100 MWp, 800 MWh — at 50 MW IT load, so sites are comparable.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={returnToGlobe}
+            className="rounded-full border-primary/40 bg-primary/10 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary hover:bg-primary/20"
+          >
+            Globe overview
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={() => data?.sites[0] && setSelected(data.sites[0])}
-            className="rounded-full border border-primary/40 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary transition-colors duration-200 hover:bg-primary/10"
+            className="rounded-full border-primary/40 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary hover:bg-primary/10"
           >
             Open instrument
-          </button>
+          </Button>
           <Link
             to="/guide"
             className="rounded-full border border-hairline px-4 py-2 text-[11px] uppercase tracking-[0.16em] opacity-75 transition-opacity hover:opacity-100"
@@ -108,14 +126,16 @@ function SitesPage() {
               const active = hovered === s.id;
               return (
                 <li key={s.id}>
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
                     onMouseEnter={() => setHovered(s.id)}
                     onFocus={() => setHovered(s.id)}
                     onClick={() => {
                       setHovered(s.id);
                       setSelected(s);
                     }}
-                    className={`group flex w-full items-baseline justify-between border-b border-hairline py-2.5 text-left transition-opacity duration-200 ${
+                    className={`group flex h-auto w-full items-baseline justify-between rounded-none border-b border-hairline px-0 py-2.5 text-left font-normal hover:bg-transparent ${
                       active ? "opacity-100" : "opacity-75 hover:opacity-95"
                     }`}
                   >
@@ -133,7 +153,7 @@ function SitesPage() {
                     <span className="num text-[12px]" style={{ color }}>
                       {formatLolp(lolp)}%
                     </span>
-                  </button>
+                  </Button>
                 </li>
               );
             })}
