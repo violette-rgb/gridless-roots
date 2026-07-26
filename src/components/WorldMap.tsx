@@ -35,6 +35,11 @@ const MODEL_LAYERS: {
   { id: "site-turbines", key: "turbines", height: 110, base: 0, color: "#e8edf5", opacity: 0.95 },
 ];
 
+export interface MapApi {
+  goToGlobe: () => void;
+  flyToSite: (site: Site) => void;
+}
+
 interface Props {
   sites: Site[];
   axes: GrilleAxes;
@@ -44,7 +49,9 @@ interface Props {
   onSelect: (site: Site) => void;
   build: BuildSpec;
   onStageChange?: (stage: ZoomStage, siteId: string | null) => void;
+  onReady?: (api: MapApi) => void;
 }
+
 
 export function WorldMap({
   sites,
