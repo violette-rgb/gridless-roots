@@ -379,8 +379,27 @@ export function WorldMap(props: Props) {
   const scale = focus ? SITE_SCALE : 1;
   const mapX = focusPoint ? CX - focusPoint.x * scale : 0;
   const mapY = focusPoint ? CY - focusPoint.y * scale : 0;
-  const mapTransform = useSmoothTransform({ x: mapX, y: mapY, scale });
-  const reveal = Math.max(0, Math.min(1, (mapTransform.scale - 1.6) / (SITE_SCALE - 2.1)));
+
+  const cameraRef = useRef<SVGGElement | null>(null);
+  const planRef = useRef<SVGGElement | null>(null);
+  const markersRef = useRef<SVGGElement | null>(null);
+
+  const applyCamera = useCallback((t: TransformState, reveal: number) => {
+    if (cameraRef.current) {
+      cameraRef.current.setAttribute(
+        "transform",
+        `matrix(${t.scale} 0 0 ${t.scale} ${t.x} ${t.y})`,
+      );
+    }
+    if (planRef.current) planRef.current.setAttribute("opacity", reveal.toFixed(3));
+    if (markersRef.current) {
+      markersRef.current.setAttribute("opacity", (1 - reveal * 0.96).toFixed(3));
+      markersRef.current.style.pointerEvents = reveal > 0.6 ? "none" : "auto";
+    }
+  }, []);
+
+  useCameraTween({ x: mapX, y: mapY, scale }, applyCamera);
+
 
   useEffect(() => {
     if (!focus) {
