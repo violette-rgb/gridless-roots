@@ -143,3 +143,126 @@
 .maplibregl-ctrl-attrib a {
   color: rgba(255, 255, 255, 0.45) !important;
 }
+
+/* ---------- map markers on the globe ---------- */
+
+.map-vignette {
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(7, 9, 12, 0.72) 100%);
+}
+
+.site-marker {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  opacity: 1;
+  transition:
+    opacity 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.site-marker.is-dim {
+  opacity: 0.28;
+}
+.site-marker.is-active {
+  transform: scale(1.25);
+  z-index: 5;
+}
+
+.site-marker__dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--mk);
+  box-shadow: 0 0 10px var(--mk);
+  transition: box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.site-marker.is-active .site-marker__dot {
+  box-shadow:
+    0 0 18px var(--mk),
+    0 0 40px var(--mk);
+}
+
+.site-marker__ring {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--mk);
+  opacity: 0;
+}
+
+.site-marker__label {
+  position: absolute;
+  left: 26px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateX(8px);
+  pointer-events: none;
+  transition:
+    opacity 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.site-marker.is-active .site-marker__label {
+  opacity: 1;
+  transform: translateX(0);
+}
+.site-marker__line {
+  width: 28px;
+  height: 1px;
+  background: linear-gradient(to right, var(--mk), rgba(255, 255, 255, 0.15));
+}
+.site-marker__text {
+  white-space: nowrap;
+  background: rgba(7, 9, 12, 0.68);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: grid;
+  gap: 2px;
+}
+.site-marker__text em {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.92);
+}
+.site-marker__text i {
+  font-style: normal;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.5;
+}
+.site-marker__text b {
+  font-weight: 200;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mk);
+  line-height: 1.1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes marker-ring {
+    0% {
+      transform: scale(0.55);
+      opacity: 0.5;
+    }
+    70% {
+      opacity: 0;
+    }
+    100% {
+      transform: scale(2.4);
+      opacity: 0;
+    }
+  }
+  .site-marker__ring {
+    animation: marker-ring 4.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+    animation-delay: var(--phase, 0s);
+  }
+}
