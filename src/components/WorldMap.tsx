@@ -63,6 +63,8 @@ export function WorldMap({
   const focus = useRef<string | null>(null);
   const flying = useRef(false);
   const terrainOn = useRef(false);
+  const siteOn = useRef(false);
+  const lastEx = useRef(0);
   const dwell = useRef<number | null>(null);
   const climb = useRef<number | null>(null);
   const spinTarget = useRef(3);
@@ -77,11 +79,11 @@ export function WorldMap({
   const onStageRef = useRef(onStageChange);
   onStageRef.current = onStageChange;
 
-  /* ---------- level 4: terrain + the site model ---------- */
+  /* ---------- terrain (from city level, zoom >= 8) ---------- */
 
-  const enableSite = useCallback((site: Site) => {
+  const enableTerrain = useCallback(() => {
     const m = mapRef.current;
-    if (!m) return;
+    if (!m || !m.isStyleLoaded()) return;
     if (!m.getSource(DEM_SOURCE)) {
       m.addSource(DEM_SOURCE, {
         type: "raster-dem",
@@ -91,55 +93,84 @@ export function WorldMap({
         maxzoom: 15,
       });
     }
-    m.setTerrain({ source: DEM_SOURCE, exaggeration: 1.6 });
     if (!m.getLayer("hillshade")) {
-      m.addLayer({
-        id: "hillshade",
-        type: "hillshade",
-        source: DEM_SOURCE,
-        paint: {
-          "hillshade-exaggeration": 0.6,
-          "hillshade-shadow-color": "#000000",
-          "hillshade-highlight-color": "#1e3a4a",
-        },
-      });
-    }
-
-    const geo = buildSiteGeoJSON(site, buildRef.current);
-    for (const l of MODEL_LAYERS) {
-      const data = geo[l.key] as never;
-      const src = m.getSource(l.id) as { setData?: (d: never) => void } | undefined;
-      if (src?.setData) {
-        src.setData(data);
-      } else {
-        m.addSource(l.id, { type: "geojson", data });
-        m.addLayer({
-          id: l.id,
-          type: "fill-extrusion",
-          source: l.id,
+      const firstSymbol = m.getStyle().layers?.find((l) => l.type === "symbol")?.id;
+      m.addLayer(
+        {
+          id: "hillshade",
+          type: "hillshade",
+          source: DEM_SOURCE,
           paint: {
-            "fill-extrusion-color": l.color,
-            "fill-extrusion-height": l.height,
-            "fill-extrusion-base": l.base,
-            "fill-extrusion-opacity": l.opacity,
+            "hillshade-exaggeration": 0.7,
+            "hillshade-shadow-color": "#000000",
+            "hillshade-highlight-color": "#1e3a4a",
           },
-        });
-      }
+        },
+        firstSymbol,
+      );
+    }
+    const z = m.getZoom();
+    // 1.2 at z8 -> 1.6 at z13
+    const ex = 1.2 + ((Math.max(8, Math.min(13, z)) - 8) / 5) * 0.4;
+    if (!terrainOn.current || Math.abs(ex - lastEx.current) > 0.03) {
+      lastEx.current = ex;
+      m.setTerrain({ source: DEM_SOURCE, exaggeration: ex });
     }
     terrainOn.current = true;
   }, []);
 
-  const disableSite = useCallback(() => {
+  const disableTerrain = useCallback(() => {
     const m = mapRef.current;
     if (!m || !terrainOn.current) return;
     m.setTerrain(null);
     if (m.getLayer("hillshade")) m.removeLayer("hillshade");
+    terrainOn.current = false;
+  }, []);
+
+  /* ---------- level 4: the site model ---------- */
+
+  const enableSite = useCallback(
+    (site: Site) => {
+      const m = mapRef.current;
+      if (!m) return;
+      enableTerrain();
+
+      const geo = buildSiteGeoJSON(site, buildRef.current);
+      for (const l of MODEL_LAYERS) {
+        const data = geo[l.key] as never;
+        const src = m.getSource(l.id) as { setData?: (d: never) => void } | undefined;
+        if (src?.setData) {
+          src.setData(data);
+        } else {
+          m.addSource(l.id, { type: "geojson", data });
+          m.addLayer({
+            id: l.id,
+            type: "fill-extrusion",
+            source: l.id,
+            paint: {
+              "fill-extrusion-color": l.color,
+              "fill-extrusion-height": l.height,
+              "fill-extrusion-base": l.base,
+              "fill-extrusion-opacity": l.opacity,
+            },
+          });
+        }
+      }
+      siteOn.current = true;
+    },
+    [enableTerrain],
+  );
+
+  const disableSite = useCallback(() => {
+    const m = mapRef.current;
+    if (!m || !siteOn.current) return;
     for (const l of MODEL_LAYERS) {
       if (m.getLayer(l.id)) m.removeLayer(l.id);
       if (m.getSource(l.id)) m.removeSource(l.id);
     }
-    terrainOn.current = false;
+    siteOn.current = false;
   }, []);
+
 
   /* ---------- camera ---------- */
 
@@ -292,6 +323,14 @@ export function WorldMap({
             .addTo(map);
           markers.current.set(s.id, { marker, el });
         }
+      });
+
+      map.on("zoom", () => {
+        const mm = mapRef.current;
+        if (!mm) return;
+        const z = mm.getZoom();
+        if (z >= 8) enableTerrain();
+        else disableTerrain();
       });
 
       map.on("mousedown", () => {
