@@ -10,7 +10,7 @@ import {
   VERDICT_COLOR,
   type Site,
 } from "@/lib/offgrid-data";
-import { terrainFor } from "@/lib/terrain";
+import { terrainFor, heightAt, waterLevel, seedOf } from "@/lib/terrain";
 
 export type ZoomStage = "globe" | "country" | "city" | "site";
 
