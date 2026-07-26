@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useState } from "react";
 import { WorldMap, type MapApi, type ZoomStage } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
-import { SiteMaquette3D } from "@/components/SiteMaquette3D";
+import { SiteMaquette3D, siteArchetype } from "@/components/SiteMaquette3D";
 import { Button } from "@/components/ui/button";
 import { useHydrated } from "@/lib/hooks";
 import type { BuildSpec } from "@/lib/site-model";
