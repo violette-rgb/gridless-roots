@@ -63,6 +63,7 @@ export function WorldMap({
   const focus = useRef<string | null>(null);
   const flying = useRef(false);
   const terrainOn = useRef(false);
+  const siteOn = useRef(false);
   const dwell = useRef<number | null>(null);
   const climb = useRef<number | null>(null);
   const spinTarget = useRef(3);
