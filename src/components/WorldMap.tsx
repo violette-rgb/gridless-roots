@@ -217,6 +217,28 @@ export function WorldMap({
           /* sky unsupported */
         }
 
+        // Dark Matter is nearly pure black — lift land, water and borders so the
+        // globe reads as a map instead of a silhouette.
+        try {
+          for (const layer of map.getStyle().layers ?? []) {
+            const id = layer.id;
+            if (layer.type === "background") {
+              map.setPaintProperty(id, "background-color", "#243140");
+            } else if (/water|ocean|sea/i.test(id) && layer.type === "fill") {
+              map.setPaintProperty(id, "fill-color", "#0a1a26");
+            } else if (/landcover|landuse|land|earth|park|wood|forest/i.test(id) && layer.type === "fill") {
+              map.setPaintProperty(id, "fill-color", "#2c3b4c");
+              map.setPaintProperty(id, "fill-opacity", 0.9);
+            } else if (/boundary|border|admin/i.test(id) && layer.type === "line") {
+              map.setPaintProperty(id, "line-color", "#7d93a8");
+              map.setPaintProperty(id, "line-opacity", 0.55);
+            }
+          }
+        } catch {
+          /* style layers unavailable */
+        }
+
+
         // markers
         for (const s of sitesRef.current) {
           const color = VERDICT_COLOR[siteVerdict(s)];
