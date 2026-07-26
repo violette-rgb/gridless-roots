@@ -181,6 +181,7 @@ export function WorldMap({
     let disposed = false;
     let map: MLMap | null = null;
     let raf = 0;
+    let resizeObs: ResizeObserver | null = null;
 
     (async () => {
       const maplibregl = await import("maplibre-gl");
