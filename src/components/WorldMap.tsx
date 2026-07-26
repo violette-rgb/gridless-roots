@@ -257,19 +257,19 @@ function SiteTerrainPlan({ site }: { site: Site }) {
         const gy = (y < N - 1 ? h[i + N] : v) - (y > 0 ? h[i - N] : v);
         const shade = Math.max(0.35, Math.min(1.35, 1 - (gx + gy) * 6));
 
-        let r = (12 + v * 58) * shade;
-        let g = (22 + v * 92) * shade;
-        let b = (34 + v * 116) * shade;
+        let r = (5 + v * 26) * shade;
+        let g = (11 + v * 44) * shade;
+        let b = (19 + v * 62) * shade;
 
         if (wl !== null && v < wl) {
-          r = 6;
-          g = 22;
-          b = 42;
+          r = 4;
+          g = 14;
+          b = 28;
         } else if (isContour) {
           const k = major ? 1 : 0.4;
-          r += 40 * k;
-          g += 96 * k;
-          b += 116 * k;
+          r += 26 * k;
+          g += 66 * k;
+          b += 82 * k;
         }
 
         const o = i * 4;
