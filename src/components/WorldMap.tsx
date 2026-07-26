@@ -54,7 +54,9 @@ const CX = 520;
 const CY = 500;
 const HOME_R = 286;
 const HOME_VIEW: ViewState = { lon: HOME[0], lat: HOME[1], progress: 0 };
-const SITE_SCALE = 3.1;
+const SITE_SCALE = 42;
+/** Half-width of the survey square in globe units; ~12 units wide once on screen. */
+const PLAN_HALF = 6;
 
 function projectPoint(lon: number, lat: number, view: ViewState): ProjectedPoint {
   const radius = HOME_R;
@@ -137,7 +139,10 @@ function easeInOut(t: number) {
  * Cinematic camera tween. Runs entirely off React state: every frame is written
  * straight to the DOM, so the globe never re-renders mid-flight.
  */
-function useCameraTween(target: TransformState, apply: (t: TransformState, reveal: number) => void) {
+function useCameraTween(
+  target: TransformState,
+  apply: (t: TransformState, reveal: number, depth: number) => void,
+) {
   const currentRef = useRef<TransformState>(target);
   const applyRef = useRef(apply);
   applyRef.current = apply;
@@ -160,8 +165,10 @@ function useCameraTween(target: TransformState, apply: (t: TransformState, revea
         scale,
       };
       currentRef.current = next;
-      const reveal = Math.max(0, Math.min(1, (scale - 1.5) / (SITE_SCALE - 2.0)));
-      applyRef.current(next, reveal);
+      // only surface the survey in the last stretch of the descent
+      const p2 = Math.log(Math.max(1, scale)) / Math.log(SITE_SCALE);
+      const reveal = Math.max(0, Math.min(1, (p2 - 0.72) / 0.26));
+      applyRef.current(next, reveal, p2);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
 
@@ -283,20 +290,55 @@ function SiteTerrainPlan({ site }: { site: Site }) {
     return canvas.toDataURL("image/png");
   }, [terrain, seed]);
 
+  const H = PLAN_HALF;
+  const K = H / 150; // scale factor from the plan's internal 300-unit box
+
   return (
     <g transform={`translate(${center.x} ${center.y})`} pointerEvents="none">
-      {topo && <image href={topo} x="-150" y="-150" width="300" height="300" preserveAspectRatio="none" />}
+      {topo && (
+        <image href={topo} x={-H} y={-H} width={H * 2} height={H * 2} preserveAspectRatio="none" />
+      )}
 
-      <rect x="-150" y="-150" width="300" height="300" fill="none" stroke="var(--primary)" strokeOpacity="0.35" strokeWidth="0.7" strokeDasharray="4 6" />
-      <text x="-150" y="-156" fill="var(--foreground)" fillOpacity="0.6" fontSize="6.5" letterSpacing="1">
+      <rect
+        x={-H}
+        y={-H}
+        width={H * 2}
+        height={H * 2}
+        fill="none"
+        stroke="var(--primary)"
+        strokeOpacity="0.35"
+        strokeWidth="1"
+        strokeDasharray="5 7"
+        vectorEffect="non-scaling-stroke"
+      />
+      <text
+        x={-H}
+        y={-H - 4 * K}
+        fill="var(--foreground)"
+        fillOpacity="0.65"
+        fontSize={6.5 * K}
+        letterSpacing={K}
+      >
         {site.nom.toUpperCase()} · 6 KM SURVEY · {terrain.landform.replace("-", " ").toUpperCase()} · {terrain.relief} M RELIEF
       </text>
-      <g transform="translate(-146 142)">
-        <line x1="0" y1="0" x2="50" y2="0" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="0.9" />
-        <text x="0" y="-4" fill="var(--foreground)" fillOpacity="0.6" fontSize="6">1 km</text>
+      <g transform={`translate(${-H + 4 * K} ${H - 8 * K})`}>
+        <line
+          x1="0"
+          y1="0"
+          x2={50 * K}
+          y2="0"
+          stroke="var(--foreground)"
+          strokeOpacity="0.7"
+          strokeWidth="1"
+          vectorEffect="non-scaling-stroke"
+        />
+        <text x="0" y={-3 * K} fill="var(--foreground)" fillOpacity="0.6" fontSize={6 * K}>
+          1 km
+        </text>
       </g>
     </g>
   );
+
 }
 
 
@@ -376,8 +418,9 @@ export function WorldMap(props: Props) {
   const cameraRef = useRef<SVGGElement | null>(null);
   const planRef = useRef<SVGGElement | null>(null);
   const markersRef = useRef<SVGGElement | null>(null);
+  const shadeRef = useRef<SVGCircleElement | null>(null);
 
-  const applyCamera = useCallback((t: TransformState, reveal: number) => {
+  const applyCamera = useCallback((t: TransformState, reveal: number, depth: number) => {
     if (cameraRef.current) {
       cameraRef.current.setAttribute(
         "transform",
@@ -385,6 +428,8 @@ export function WorldMap(props: Props) {
       );
     }
     if (planRef.current) planRef.current.setAttribute("opacity", reveal.toFixed(3));
+    // the globe shading only reads at globe scale — lift it as the camera descends
+    if (shadeRef.current) shadeRef.current.setAttribute("opacity", Math.max(0, 1 - depth * 2.2).toFixed(3));
     if (markersRef.current) {
       markersRef.current.setAttribute("opacity", (1 - reveal * 0.96).toFixed(3));
       markersRef.current.style.pointerEvents = reveal > 0.6 ? "none" : "auto";
@@ -450,7 +495,7 @@ export function WorldMap(props: Props) {
           <g ref={planRef} opacity="0" pointerEvents="none">
             {focus && <SiteTerrainPlan key={focus.id} site={focus} />}
           </g>
-          <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
+          <circle ref={shadeRef} cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
           <circle cx={CX} cy={CY} r={HOME_R} fill="none" stroke="var(--primary)" strokeOpacity="0.2" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
 
           <g ref={markersRef} opacity="1">
