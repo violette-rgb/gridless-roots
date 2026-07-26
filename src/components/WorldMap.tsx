@@ -287,23 +287,55 @@ function SiteTerrainPlan({ site }: { site: Site }) {
     return canvas.toDataURL("image/png");
   }, [terrain, seed]);
 
-  return (
-    <g
-      transform={`translate(${center.x} ${center.y}) scale(${PLAN_HALF / 150})`}
-      pointerEvents="none"
-    >
-      {topo && <image href={topo} x="-150" y="-150" width="300" height="300" preserveAspectRatio="none" />}
+  const H = PLAN_HALF;
+  const K = H / 150; // scale factor from the plan's internal 300-unit box
 
-      <rect x="-150" y="-150" width="300" height="300" fill="none" stroke="var(--primary)" strokeOpacity="0.35" strokeWidth="0.7" strokeDasharray="4 6" />
-      <text x="-150" y="-156" fill="var(--foreground)" fillOpacity="0.6" fontSize="6.5" letterSpacing="1">
+  return (
+    <g transform={`translate(${center.x} ${center.y})`} pointerEvents="none">
+      {topo && (
+        <image href={topo} x={-H} y={-H} width={H * 2} height={H * 2} preserveAspectRatio="none" />
+      )}
+
+      <rect
+        x={-H}
+        y={-H}
+        width={H * 2}
+        height={H * 2}
+        fill="none"
+        stroke="var(--primary)"
+        strokeOpacity="0.35"
+        strokeWidth="1"
+        strokeDasharray="5 7"
+        vectorEffect="non-scaling-stroke"
+      />
+      <text
+        x={-H}
+        y={-H - 4 * K}
+        fill="var(--foreground)"
+        fillOpacity="0.65"
+        fontSize={6.5 * K}
+        letterSpacing={K}
+      >
         {site.nom.toUpperCase()} · 6 KM SURVEY · {terrain.landform.replace("-", " ").toUpperCase()} · {terrain.relief} M RELIEF
       </text>
-      <g transform="translate(-146 142)">
-        <line x1="0" y1="0" x2="50" y2="0" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="0.9" />
-        <text x="0" y="-4" fill="var(--foreground)" fillOpacity="0.6" fontSize="6">1 km</text>
+      <g transform={`translate(${-H + 4 * K} ${H - 8 * K})`}>
+        <line
+          x1="0"
+          y1="0"
+          x2={50 * K}
+          y2="0"
+          stroke="var(--foreground)"
+          strokeOpacity="0.7"
+          strokeWidth="1"
+          vectorEffect="non-scaling-stroke"
+        />
+        <text x="0" y={-3 * K} fill="var(--foreground)" fillOpacity="0.6" fontSize={6 * K}>
+          1 km
+        </text>
       </g>
     </g>
   );
+
 }
 
 
