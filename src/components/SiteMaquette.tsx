@@ -134,7 +134,7 @@ export function SiteMaquette({
       {/* batteries */}
       {scene.batteries.map((b, i) => (
         <g key={`b${i}`}>
-          <polygon points={b.left} fill="#5d7near" />
+          <polygon points={b.left} fill="#5d7286" />
           <polygon points={b.right} fill="#6a7f95" />
           <polygon points={b.top} fill="#8fa3b8" />
         </g>
