@@ -186,7 +186,12 @@ export function WorldMap({
       level.current = lv;
       focus.current = lv > 0 && site ? site.id : null;
       spinTarget.current = lv === 0 ? 3 : 0;
-      onStageRef.current?.(target.stage, focus.current);
+      // fade every other marker out while the camera moves
+      markers.current.forEach(({ el }, id) => {
+        el.classList.toggle("is-flying", !!focus.current && id !== focus.current);
+      });
+      // the destination panel only appears in the last 600 ms of the flight
+      window.setTimeout(() => onStageRef.current?.(target.stage, focus.current), 1400);
       m.flyTo({
         center: site && lv > 0 ? [site.longitude, site.latitude] : m.getCenter(),
         zoom: target.zoom,
@@ -198,6 +203,7 @@ export function WorldMap({
       });
       const done = () => {
         flying.current = false;
+        markers.current.forEach(({ el }) => el.classList.remove("is-flying"));
         if (lv === 3 && site) enableSite(site);
       };
       m.once("moveend", done);
@@ -314,6 +320,8 @@ export function WorldMap({
           el.addEventListener("click", (ev) => {
             ev.stopPropagation();
             if (dwell.current) window.clearTimeout(dwell.current);
+            el.classList.add("is-press");
+            window.setTimeout(() => el.classList.remove("is-press"), 120);
             onHoverRef.current(s.id);
             onSelectRef.current(s);
             goToLevel(3, s);
