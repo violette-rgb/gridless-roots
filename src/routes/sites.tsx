@@ -87,8 +87,10 @@ function SitesPage() {
       const i = current ? ordered.findIndex((s) => s.id === current.id) : -1;
       const next = ordered[(i + dir + ordered.length) % ordered.length];
       setHovered(next.id);
-      setSelected(next);
+      setMaquetteOpen(false);
       api?.flyToSite(next);
+      // the instrument only reappears as the camera settles on the new site
+      window.setTimeout(() => setSelected(next), 2400);
     },
     [api, current, ordered],
   );
