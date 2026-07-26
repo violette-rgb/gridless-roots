@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useState } from "react";
-import { WorldMap, type ZoomStage } from "@/components/WorldMap";
+import { WorldMap, type MapApi, type ZoomStage } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
 import { SiteMaquette3D } from "@/components/SiteMaquette3D";
 import { Button } from "@/components/ui/button";
