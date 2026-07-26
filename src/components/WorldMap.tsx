@@ -448,15 +448,17 @@ export function WorldMap(props: Props) {
         </defs>
 
         <rect width="1000" height="1000" fill="var(--page)" />
-        <g transform={`matrix(${mapTransform.scale} 0 0 ${mapTransform.scale} ${mapTransform.x} ${mapTransform.y})`}>
+        <g ref={cameraRef} transform="matrix(1 0 0 1 0 0)">
           <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeOcean)" filter="url(#glow)" opacity="0.95" />
           <Graticule />
           <CountryLayer countries={countries} />
-          <AnimatePresence>{focus && reveal > 0.01 && <SiteTerrainPlan key={focus.id} site={focus} reveal={reveal} />}</AnimatePresence>
+          <g ref={planRef} opacity="0" pointerEvents="none">
+            {focus && <SiteTerrainPlan key={focus.id} site={focus} />}
+          </g>
           <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
           <circle cx={CX} cy={CY} r={HOME_R} fill="none" stroke="var(--primary)" strokeOpacity="0.2" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
 
-          <g opacity={1 - reveal * 0.96} pointerEvents={reveal > 0.6 ? "none" : "auto"}>
+          <g ref={markersRef} opacity="1">
             <MarkerLayer
               sites={sites}
               hoveredId={hoveredId}
@@ -467,6 +469,7 @@ export function WorldMap(props: Props) {
               panelOpen={panelOpen}
             />
           </g>
+
         </g>
       </svg>
 
