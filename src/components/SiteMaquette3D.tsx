@@ -32,31 +32,56 @@ function noise(x: number, y: number, seed: number) {
   return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
 }
 
+/** Stable integer hash of the site id — makes every site's relief unique. */
+function idHash(id: string) {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h % 100000);
+}
+
+export type Archetype = "fjord" | "plateau" | "coastal" | "rolling" | "plain";
+
+/** Landform character derived from the site: fjord, plateau, coast, hills or plain. */
+export function siteArchetype(site: Site): Archetype {
+  const h = idHash(site.id);
+  if (site.latitude > 62) return h % 2 === 0 ? "fjord" : "plateau";
+  if (site.latitude > 55) return h % 3 === 0 ? "plateau" : "coastal";
+  if (h % 3 === 0) return "coastal";
+  return h % 2 === 0 ? "rolling" : "plain";
+}
+
 /** Relief character derived from the site: coastal fjord, plateau or plain. */
 function reliefProfile(site: Site) {
-  const seed = Math.abs(Math.round(site.latitude * 91 + site.longitude * 37));
-  const north = Math.max(0, Math.min(1, (site.latitude - 40) / 30));
-  return {
-    seed,
-    amplitude: 1.4 + north * 4.6,
-    frequency: 0.06 + (seed % 7) * 0.008,
-    ridge: (seed % 3) / 2,
+  const seed = idHash(site.id) + Math.round(Math.abs(site.longitude) * 13);
+  const kind = siteArchetype(site);
+  const table: Record<Archetype, { amplitude: number; frequency: number; ridge: number; channel: number; terrace: number }> = {
+    fjord: { amplitude: 6.4, frequency: 0.075, ridge: (seed % 5) / 4, channel: 1.15, terrace: 0 },
+    plateau: { amplitude: 3.2, frequency: 0.045, ridge: (seed % 3) / 3, channel: 0.15, terrace: 0.8 },
+    coastal: { amplitude: 2.6, frequency: 0.06, ridge: (seed % 7) / 6, channel: 0.75, terrace: 0 },
+    rolling: { amplitude: 4.2, frequency: 0.095, ridge: (seed % 4) / 3, channel: 0.25, terrace: 0 },
+    plain: { amplitude: 1.1, frequency: 0.05, ridge: 0, channel: 0.1, terrace: 0 },
   };
+  return { seed, kind, ...table[kind] };
 }
 
 function elevationFn(site: Site) {
-  const { seed, amplitude, frequency, ridge } = reliefProfile(site);
+  const { seed, amplitude, frequency, ridge, channel: chAmt, terrace } = reliefProfile(site);
   return (x: number, y: number) => {
     const n1 = noise(x * frequency, y * frequency, seed);
     const n2 = noise(x * frequency * 2.7, y * frequency * 2.7, seed + 3) * 0.45;
     const n3 = noise(x * frequency * 6.1, y * frequency * 6.1, seed + 11) * 0.18;
     let h = (n1 + n2 + n3) / 1.63;
+    if (terrace > 0) h = Math.round(h * 5) / 5 + h * 0.2 * (1 - terrace);
     // a valley / water channel through the middle for coastal sites
-    const channel = Math.exp(-((y + ridge * 10) ** 2) / 90) * 0.55;
+    const channel = Math.exp(-((y + ridge * 12) ** 2) / 70) * chAmt * 0.6;
     h -= channel;
     return h * amplitude;
   };
 }
+
 
 function Terrain({ site }: { site: Site }) {
   const geometry = useMemo(() => {
