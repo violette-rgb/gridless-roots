@@ -411,10 +411,12 @@ export function WorldMap(props: Props) {
     onApproach?.(null);
     onZoomStageChange?.("country", focus.id);
     const timers = [
-      window.setTimeout(() => onZoomStageChange?.("city", focus.id), 950),
-      window.setTimeout(() => onZoomStageChange?.("site", focus.id), 1950),
-      window.setTimeout(() => onApproach?.(focus.id), 2850),
+      window.setTimeout(() => onZoomStageChange?.("city", focus.id), 700),
+      window.setTimeout(() => onZoomStageChange?.("site", focus.id), 1450),
+      // the 3D maquette only mounts once the camera has fully settled
+      window.setTimeout(() => onApproach?.(focus.id), 2050),
     ];
+
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [focus, onApproach, onZoomStageChange]);
 
