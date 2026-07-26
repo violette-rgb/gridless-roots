@@ -129,39 +129,47 @@ function useCountries() {
   return countries;
 }
 
-function useSmoothTransform(target: TransformState) {
+function easeInOut(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+/**
+ * Cinematic camera tween. Runs entirely off React state: every frame is written
+ * straight to the DOM, so the globe never re-renders mid-flight.
+ */
+function useCameraTween(target: TransformState, apply: (t: TransformState, reveal: number) => void) {
   const currentRef = useRef<TransformState>(target);
-  const [current, setCurrent] = useState<TransformState>(target);
+  const applyRef = useRef(apply);
+  applyRef.current = apply;
 
   useEffect(() => {
+    const from = currentRef.current;
+    const duration =
+      Math.abs(Math.log(target.scale / from.scale)) > 0.05 ? 1900 : 900;
+    const start = performance.now();
     let raf = 0;
-    let last = performance.now();
 
     const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      const previous = currentRef.current;
-      const k = 1 - Math.exp(-1.85 * dt);
+      const p = Math.min(1, (now - start) / duration);
+      const e = easeInOut(p);
+      // zoom interpolates geometrically so the descent feels linear in altitude
+      const scale = from.scale * Math.pow(target.scale / from.scale, e);
       const next = {
-        x: previous.x + (target.x - previous.x) * k,
-        y: previous.y + (target.y - previous.y) * k,
-        scale: previous.scale + (target.scale - previous.scale) * k,
+        x: from.x + (target.x - from.x) * e,
+        y: from.y + (target.y - from.y) * e,
+        scale,
       };
-      const settled =
-        Math.abs(next.x - target.x) < 0.2 &&
-        Math.abs(next.y - target.y) < 0.2 &&
-        Math.abs(next.scale - target.scale) < 0.002;
-      currentRef.current = settled ? target : next;
-      setCurrent(currentRef.current);
-      if (!settled) raf = requestAnimationFrame(tick);
+      currentRef.current = next;
+      const reveal = Math.max(0, Math.min(1, (scale - 1.5) / (SITE_SCALE - 2.0)));
+      applyRef.current(next, reveal);
+      if (p < 1) raf = requestAnimationFrame(tick);
     };
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [target.x, target.y, target.scale]);
-
-  return current;
 }
+
 
 function Graticule() {
   const paths = useMemo(() => {
