@@ -282,10 +282,11 @@ function SitesPage() {
             style={{ transitionTimingFunction: "cubic-bezier(0.22,1,0.36,1)" }}
           >
             <div className="flex items-baseline justify-between">
-              <div className="label-xs">
-                Campus maquette · {current ? siteArchetype(current) : ""}
+              <div className="label-xs truncate">
+                {current ? siteArchetype(current) : "campus"} maquette
               </div>
-              <div className="label-xs text-primary opacity-100">{current?.nom}</div>
+              <div className="label-xs shrink-0 pl-2 text-primary opacity-100">{current?.nom}</div>
+
 
             </div>
             <SiteMaquette3D
