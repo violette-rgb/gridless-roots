@@ -272,15 +272,12 @@ function SiteTerrainPlan({ site }: { site: Site }) {
   }, [terrain, seed]);
 
   return (
-    <motion.g
+    <g
       transform={`translate(${center.x} ${center.y})`}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: reveal }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.25, ease: "linear" }}
       pointerEvents="none"
       shapeRendering="crispEdges"
     >
+
       {cells.map((c, i) => (
         <rect key={i} x={c.x} y={c.y} width={7} height={7} fill={c.fill} />
       ))}
