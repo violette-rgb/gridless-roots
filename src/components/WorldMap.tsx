@@ -302,7 +302,7 @@ function SiteTerrainPlan({ site }: { site: Site }) {
         <line x1="0" y1="0" x2="50" y2="0" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="0.9" />
         <text x="0" y="-4" fill="var(--foreground)" fillOpacity="0.6" fontSize="6">1 km</text>
       </g>
-    </motion.g>
+    </g>
   );
 }
 
