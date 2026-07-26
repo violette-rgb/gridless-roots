@@ -194,6 +194,10 @@
     0 0 52px var(--mk);
 }
 
+.site-marker__ring,
+.site-marker__dot {
+  pointer-events: none;
+}
 .site-marker__ring {
   position: absolute;
   width: 26px;
