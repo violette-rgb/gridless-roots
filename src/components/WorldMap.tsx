@@ -209,11 +209,6 @@ function CountryLayer({ countries }: { countries: CountryCollection | null }) {
   );
 }
 
-function seedNum(id: string) {
-  let h = 0;
-  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) % 100000;
-  return h;
-}
 
 /** Pure topographic zoom of the selected zone — relief only, no schematic overlay. */
 function SiteTerrainPlan({ site, reveal }: { site: Site; reveal: number }) {
