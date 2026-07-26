@@ -184,13 +184,15 @@ export function WorldMap({
   /* ---------- camera ---------- */
 
   const goToLevel = useCallback(
-    (n: number, site: Site | null) => {
+    (n: number, site: Site | null, force = false) => {
       const m = mapRef.current;
-      if (!m || flying.current) return;
+      if (!m) return;
+      if (flying.current && !force) return;
       const lv = Math.max(0, Math.min(3, n));
       const target = LEVELS[lv];
       if (lv > 0 && !site) return;
       if (lv < 3) disableSite();
+
       flying.current = true;
       level.current = lv;
       focus.current = lv > 0 && site ? site.id : null;
