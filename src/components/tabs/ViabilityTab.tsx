@@ -77,7 +77,20 @@ export function ViabilityTab({
         </div>
       </div>
 
-      <div className="grid gap-7 md:grid-cols-[1fr_auto]">
+      <div className="space-y-7">
+        <div className="flex flex-col">
+          <span className="label-xs">Loss of load probability</span>
+          <div className="mt-1 flex items-baseline">
+            <span
+              className="num font-extralight leading-[0.85] transition-colors duration-[400ms]"
+              style={{ fontSize: "clamp(52px, 5.4vw, 84px)", color, fontWeight: 200 }}
+            >
+              {display}
+            </span>
+            <span className="ml-2 text-2xl font-extralight opacity-60">%</span>
+          </div>
+        </div>
+
         <div className="space-y-7">
           <AxisSlider
             label="Wind turbines · 6 MW"
@@ -100,20 +113,8 @@ export function ViabilityTab({
             unit="MWh"
           />
         </div>
-
-        <div className="flex flex-col justify-center md:min-w-[280px] md:pl-8">
-          <span className="label-xs">Loss of load probability</span>
-          <div className="mt-1 flex items-baseline">
-            <span
-              className="num font-extralight leading-[0.85] transition-colors duration-[400ms]"
-              style={{ fontSize: "clamp(56px, 6.5vw, 96px)", color, fontWeight: 200 }}
-            >
-              {display}
-            </span>
-            <span className="ml-2 text-2xl font-extralight opacity-60">%</span>
-          </div>
-        </div>
       </div>
+
 
       <motion.p
         key={verdictSentence(lolp)}
