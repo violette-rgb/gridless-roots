@@ -107,9 +107,9 @@ export function WorldMap({
 
     const geo = buildSiteGeoJSON(site, buildRef.current);
     for (const l of MODEL_LAYERS) {
-      const data = geo[l.key] as unknown as GeoJSON.FeatureCollection;
-      const src = m.getSource(l.id) as maplibregl.GeoJSONSource | undefined;
-      if (src) {
+      const data = geo[l.key] as never;
+      const src = m.getSource(l.id) as { setData?: (d: never) => void } | undefined;
+      if (src?.setData) {
         src.setData(data);
       } else {
         m.addSource(l.id, { type: "geojson", data });
@@ -192,7 +192,6 @@ export function WorldMap({
         zoom: 1.5,
         pitch: 0,
         attributionControl: false,
-        projection: { type: "globe" },
       });
       mapRef.current = map;
       map.on("error", (e) => console.error("[map]", e?.error ?? e));
@@ -201,6 +200,11 @@ export function WorldMap({
       map.on("load", () => {
         if (!map) return;
         map.resize();
+        try {
+          map.setProjection({ type: "globe" });
+        } catch {
+          /* projection unsupported */
+        }
         try {
           map.setSky({
             "sky-color": "#05070a",
