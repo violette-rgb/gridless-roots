@@ -70,29 +70,39 @@ export function SiteDetail({
           : "absolute right-4 top-24 bottom-6 w-[min(38vw,470px)] max-lg:left-4 max-lg:w-auto"
       }`}
     >
-      <header className="flex items-start justify-between border-b border-hairline px-8 py-6">
+      <header className="flex items-start justify-between border-b border-hairline px-6 py-5">
         <div>
           <div className="label-xs">
             {site.pays} · {site.latitude.toFixed(2)}°, {site.longitude.toFixed(2)}°
           </div>
-          <h2 className="mt-1 text-3xl font-extralight tracking-tight">{site.nom}</h2>
+          <h2 className="mt-1 text-2xl font-extralight tracking-tight">{site.nom}</h2>
         </div>
-        {onClose && !embedded && (
-          <button
-            onClick={onClose}
-            className="label-xs rounded-full border border-hairline px-3 py-1.5 transition-colors duration-200 hover:border-primary/40 hover:opacity-90"
-          >
-            Close
-          </button>
+        {!embedded && (
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              to="/instrument"
+              className="label-xs rounded-full border border-primary/40 px-3 py-1.5 text-primary transition-colors duration-200 hover:bg-primary/10"
+            >
+              Full page
+            </Link>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="label-xs rounded-full border border-hairline px-3 py-1.5 transition-colors duration-200 hover:border-primary/40 hover:opacity-90"
+              >
+                Close
+              </button>
+            )}
+          </div>
         )}
       </header>
 
-      <nav className="flex gap-7 overflow-x-auto border-b border-hairline px-8">
+      <nav className="flex gap-5 overflow-x-auto border-b border-hairline px-6">
         {TABS.map((t, i) => (
           <button
             key={t}
             onClick={() => setTab(i)}
-            className={`relative whitespace-nowrap py-4 text-xs uppercase tracking-[0.08em] transition-opacity duration-200 ${
+            className={`relative whitespace-nowrap py-3.5 text-[11px] uppercase tracking-[0.08em] transition-opacity duration-200 ${
               tab === i ? "opacity-100" : "opacity-60 hover:opacity-80"
             }`}
           >
@@ -107,7 +117,8 @@ export function SiteDetail({
         ))}
       </nav>
 
-      <div className="flex-1 overflow-y-auto px-8 py-8">
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}
