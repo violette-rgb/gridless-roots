@@ -1,27 +1,29 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ViabilityTab } from "@/components/tabs/ViabilityTab";
 import { ProfileTab } from "@/components/tabs/ProfileTab";
 import { ModelTab } from "@/components/tabs/ModelTab";
-import { useHydrated } from "@/lib/hooks";
-import { terrainFor } from "@/lib/terrain";
+import { ComparisonTab } from "@/components/tabs/ComparisonTab";
+import { ContextTab } from "@/components/tabs/ContextTab";
 import type { Dataset, Site } from "@/lib/offgrid-data";
+import type { BuildSpec } from "@/lib/site-model";
 
-
-const SiteConcept = lazy(() => import("@/components/tabs/SiteConcept"));
-
-const TABS = ["Viability", "Annual profile", "The model", "Site concept"] as const;
+const TABS = ["Viability", "Annual profile", "Comparison", "The model", "Context"] as const;
 
 export function SiteDetail({
   site,
   data,
   onClose,
   embedded = false,
+  onBuild,
+  onPickSite,
 }: {
   site: Site;
   data: Dataset;
   onClose?: () => void;
   embedded?: boolean;
+  onBuild?: (b: BuildSpec) => void;
+  onPickSite?: (s: Site) => void;
 }) {
   const axes = data.grille_axes;
   const [tab, setTab] = useState(0);
@@ -34,7 +36,6 @@ export function SiteDetail({
   const [turbines, setTurbines] = useState(opt?.turbines ?? axes.turbines[0]);
   const [pv, setPv] = useState(opt?.pv_mw ?? axes.pv_mw[0]);
   const [batt, setBatt] = useState(opt?.batt_mwh ?? axes.batt_mwh[0]);
-  const hydrated = useHydrated();
 
   useEffect(() => {
     const o = scenario.dimensionnement_optimal["1%"];
@@ -44,6 +45,11 @@ export function SiteDetail({
       setBatt(o.batt_mwh);
     }
   }, [scenario]);
+
+  // The map rebuilds its site model from these numbers.
+  useEffect(() => {
+    onBuild?.({ turbines, pv_mw: pv, batt_mwh: batt });
+  }, [turbines, pv, batt, onBuild]);
 
   useEffect(() => {
     if (!onClose) return;
@@ -61,15 +67,10 @@ export function SiteDetail({
       className={`panel pointer-events-auto z-40 flex flex-col overflow-hidden ${
         embedded
           ? "relative h-[calc(100vh-8rem)] w-full"
-          : "absolute right-4 top-24 bottom-6 w-[min(64vw,900px)] max-lg:left-4 max-lg:w-auto"
+          : "absolute right-4 top-24 bottom-6 w-[min(52vw,740px)] max-lg:left-4 max-lg:w-auto"
       }`}
     >
-      <motion.header
-        initial="hidden"
-        animate="show"
-        variants={{ show: { transition: { staggerChildren: 0.04 } } }}
-        className="flex items-start justify-between border-b border-hairline px-8 py-6"
-      >
+      <header className="flex items-start justify-between border-b border-hairline px-8 py-6">
         <div>
           <div className="label-xs">
             {site.pays} · {site.latitude.toFixed(2)}°, {site.longitude.toFixed(2)}°
@@ -84,15 +85,15 @@ export function SiteDetail({
             Close
           </button>
         )}
-      </motion.header>
+      </header>
 
-      <nav className="flex gap-7 border-b border-hairline px-8">
+      <nav className="flex gap-7 overflow-x-auto border-b border-hairline px-8">
         {TABS.map((t, i) => (
           <button
             key={t}
             onClick={() => setTab(i)}
-            className={`relative py-4 text-xs uppercase tracking-[0.08em] transition-opacity duration-200 ${
-              tab === i ? "opacity-100" : "opacity-65 hover:opacity-70"
+            className={`relative whitespace-nowrap py-4 text-xs uppercase tracking-[0.08em] transition-opacity duration-200 ${
+              tab === i ? "opacity-100" : "opacity-60 hover:opacity-80"
             }`}
           >
             {t}
@@ -131,80 +132,19 @@ export function SiteDetail({
               />
             )}
             {tab === 1 && <ProfileTab site={site} />}
-            {tab === 2 && <ModelTab />}
-            {tab === 3 && (
-              <div className="space-y-5">
-                <p className="label-xs">
-                  {turbines} turbines · {pv} MWp solar · {batt.toLocaleString("en-US")} MWh
-                  storage · {pIt} MW IT
-                </p>
-                {hydrated ? (
-                  <Suspense
-                    fallback={
-                      <div className="label-xs h-[420px] rounded-xl border border-hairline" />
-                    }
-                  >
-                    <SiteConcept
-                      siteId={site.id}
-                      latitude={site.latitude}
-                      turbines={turbines}
-                      pv={pv}
-                      batt={batt}
-                      pIt={pIt}
-                    />
-
-                  </Suspense>
-                ) : null}
-                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline sm:grid-cols-4">
-                  <Spec label="Wind rated" value={`${turbines * 6} MW`} />
-                  <Spec label="Solar rated" value={`${pv} MWp`} />
-                  <Spec label="Storage" value={`${batt.toLocaleString("en-US")} MWh`} />
-                  <Spec
-                    label="Storage autonomy"
-                    value={`${(batt / (pIt * site.indicateurs.pue_moyen)).toFixed(1)} h`}
-                  />
-                  <Spec label="Turbine class" value="6 MW · 150 m rotor" />
-                  <Spec
-                    label="Wind footprint"
-                    value={`${(turbines * 0.54).toFixed(1)} km²`}
-                  />
-                  <Spec label="Solar footprint" value={`${(pv * 1.2).toFixed(0)} ha`} />
-                  <Spec
-                    label="Compute halls"
-                    value={`${Math.max(2, Math.round(pIt / 10))} × 5 MW`}
-                  />
-                </div>
-                <div className="max-w-2xl space-y-2">
-                  <div className="label-xs">
-                    Landform · {terrainFor(site.id, site.latitude).landform.replace("-", " ")} ·{" "}
-                    {terrainFor(site.id, site.latitude).relief} m relief across 6 km
-                  </div>
-                  <p className="text-sm font-light leading-relaxed text-foreground/75">
-                    {terrainFor(site.id, site.latitude).note}
-                  </p>
-                  <p className="text-[13px] font-light leading-relaxed text-foreground/72">
-                    The plan is laid out on the site's own topography: contour interval reads
-                    the synthetic 6 km survey square, rotors take the highest wind-exposed
-                    ground at five rotor diameters apart, the solar field occupies low-slope
-                    south-facing ground with row tilt set by latitude, and halls plus storage
-                    sit on the flattest graded pad. Drag to orbit.
-                  </p>
-                </div>
-
-              </div>
+            {tab === 2 && (
+              <ComparisonTab
+                data={data}
+                site={site}
+                pIt={pIt}
+                onPick={(s) => onPickSite?.(s)}
+              />
             )}
+            {tab === 3 && <ModelTab />}
+            {tab === 4 && <ContextTab />}
           </motion.div>
         </AnimatePresence>
       </div>
     </motion.aside>
-  );
-}
-
-function Spec({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-background/40 px-4 py-4">
-      <div className="label-xs">{label}</div>
-      <div className="num mt-1.5 text-sm font-light">{value}</div>
-    </div>
   );
 }
