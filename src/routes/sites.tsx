@@ -5,12 +5,14 @@ import { useCallback, useState } from "react";
 import { terrainFor } from "@/lib/terrain";
 import { WorldMap, type ZoomStage } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
+import SiteConcept from "@/components/tabs/SiteConcept";
 import { Button } from "@/components/ui/button";
 import {
   siteVerdict,
   formatLolp,
   referenceLolp,
   loadDataset,
+  REFERENCE_BUILD,
   VERDICT_COLOR,
   type Site,
 } from "@/lib/offgrid-data";
