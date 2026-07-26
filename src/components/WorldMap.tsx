@@ -181,13 +181,38 @@ export function WorldMap({
     let disposed = false;
     let map: MLMap | null = null;
     let raf = 0;
+    let resizeObs: ResizeObserver | null = null;
 
     (async () => {
       const maplibregl = await import("maplibre-gl");
       if (disposed || !container.current) return;
       map = new maplibregl.Map({
         container: container.current,
-        style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+        style: {
+          version: 8,
+          sources: {
+            basemap: {
+              type: "raster",
+              tiles: [
+                "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+                "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+                "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+              ],
+              tileSize: 256,
+              maxzoom: 19,
+              attribution: "© OpenStreetMap contributors © CARTO",
+            },
+          },
+          layers: [
+            { id: "bg", type: "background", paint: { "background-color": "#16222e" } },
+            {
+              id: "basemap",
+              type: "raster",
+              source: "basemap",
+              paint: { "raster-brightness-min": 0.06, "raster-contrast": 0.15, "raster-saturation": -0.05, "raster-opacity": 1 },
+            },
+          ],
+        },
         center: [10, 25],
         zoom: 1.5,
         pitch: 0,
@@ -196,6 +221,10 @@ export function WorldMap({
       mapRef.current = map;
       map.on("error", (e) => console.error("[map]", e?.error ?? e));
       map.dragRotate.disable();
+
+      const ro = new ResizeObserver(() => map?.resize());
+      ro.observe(container.current);
+      resizeObs = ro;
 
       map.on("load", () => {
         if (!map) return;
@@ -217,26 +246,7 @@ export function WorldMap({
           /* sky unsupported */
         }
 
-        // Dark Matter is nearly pure black — lift land, water and borders so the
-        // globe reads as a map instead of a silhouette.
-        try {
-          for (const layer of map.getStyle().layers ?? []) {
-            const id = layer.id;
-            if (layer.type === "background") {
-              map.setPaintProperty(id, "background-color", "#243140");
-            } else if (/water|ocean|sea/i.test(id) && layer.type === "fill") {
-              map.setPaintProperty(id, "fill-color", "#0a1a26");
-            } else if (/landcover|landuse|land|earth|park|wood|forest/i.test(id) && layer.type === "fill") {
-              map.setPaintProperty(id, "fill-color", "#2c3b4c");
-              map.setPaintProperty(id, "fill-opacity", 0.9);
-            } else if (/boundary|border|admin/i.test(id) && layer.type === "line") {
-              map.setPaintProperty(id, "line-color", "#7d93a8");
-              map.setPaintProperty(id, "line-opacity", 0.55);
-            }
-          }
-        } catch {
-          /* style layers unavailable */
-        }
+
 
 
         // markers
@@ -318,6 +328,7 @@ export function WorldMap({
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
+      resizeObs?.disconnect();
       if (dwell.current) window.clearTimeout(dwell.current);
       if (climb.current) window.clearTimeout(climb.current);
       markers.current.forEach(({ marker }) => marker.remove());
