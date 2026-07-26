@@ -215,41 +215,58 @@ function seedNum(id: string) {
   return h;
 }
 
-/** Zoomed-in topographic site map, drawn in globe coordinates around the site. */
+/** Pure topographic zoom of the selected zone — relief only, no schematic overlay. */
 function SiteTerrainPlan({ site, reveal }: { site: Site; reveal: number }) {
   const center = projectPoint(site.longitude, site.latitude, HOME_VIEW);
   const terrain = terrainFor(site.id, site.latitude);
-  const seed = seedNum(site.id);
-  const rug = terrain.ruggedness;
+  const seed = seedOf(site.id);
 
-  const contours = useMemo(() => {
-    const rows: { d: string; index: number }[] = [];
-    for (let i = 0; i < 16; i += 1) {
-      const y = -132 + i * 17;
-      const a = Math.sin(seed * 0.017 + i * 0.7) * 16 * (0.5 + rug);
-      const b = Math.cos(seed * 0.031 + i * 0.53) * 13 * (0.5 + rug);
-      const c = Math.sin(seed * 0.011 + i * 0.9) * 10 * (0.4 + rug);
-      rows.push({
-        index: i,
-        d: `M-150 ${(y + a * 0.4).toFixed(1)} C-96 ${(y - a).toFixed(1)} -44 ${(y + b).toFixed(1)} 6 ${(y - c).toFixed(1)} C58 ${(y + b * 0.6).toFixed(1)} 106 ${(y - a * 0.7).toFixed(1)} 150 ${(y + c * 0.5).toFixed(1)}`,
-      });
+  const { cells, contours } = useMemo(() => {
+    const N = 44;
+    const span = 300;
+    const step = span / N;
+    const wl = waterLevel(terrain);
+    const h: number[] = [];
+    for (let iy = 0; iy < N; iy += 1) {
+      for (let ix = 0; ix < N; ix += 1) {
+        const u = ((ix + 0.5) / N) * 2 - 1;
+        const v = ((iy + 0.5) / N) * 2 - 1;
+        h.push(heightAt(u, v, terrain, seed));
+      }
     }
-    return rows;
-  }, [seed, rug]);
-
-  const turbines = useMemo(
-    () =>
-      Array.from({ length: rug > 0.7 ? 7 : 9 }, (_, i) => {
-        const t = i / (rug > 0.7 ? 6 : 8);
-        return {
-          x: -132 + t * 264,
-          y: -62 + Math.sin(seed * 0.013 + t * 3.1) * 20 * (0.4 + rug),
-        };
-      }),
-    [seed, rug],
-  );
-
-  const panelRows = rug > 0.62 ? 3 : 5;
+    const bands = 12;
+    const cellList = h.map((value, i) => {
+      const ix = i % N;
+      const iy = Math.floor(i / N);
+      const submerged = wl !== null && value < wl;
+      return {
+        x: -span / 2 + ix * step,
+        y: -span / 2 + iy * step,
+        fill: submerged
+          ? `rgb(8,${Math.round(26 + value * 40)},${Math.round(46 + value * 50)})`
+          : `rgb(${Math.round(16 + value * 52)},${Math.round(26 + value * 74)},${Math.round(36 + value * 92)})`,
+      };
+    });
+    // contour edges: mark cells where the elevation band changes
+    const edges: { x: number; y: number; w: number; hgt: number; major: boolean }[] = [];
+    for (let iy = 0; iy < N; iy += 1) {
+      for (let ix = 0; ix < N; ix += 1) {
+        const i = iy * N + ix;
+        const band = Math.floor(h[i] * bands);
+        const right = ix < N - 1 ? Math.floor(h[i + 1] * bands) : band;
+        const down = iy < N - 1 ? Math.floor(h[i + N] * bands) : band;
+        if (band === right && band === down) continue;
+        edges.push({
+          x: -span / 2 + ix * step,
+          y: -span / 2 + iy * step,
+          w: step,
+          hgt: step,
+          major: band % 3 === 0,
+        });
+      }
+    }
+    return { cells: cellList, contours: edges };
+  }, [terrain, seed]);
 
   return (
     <motion.g
@@ -257,85 +274,34 @@ function SiteTerrainPlan({ site, reveal }: { site: Site; reveal: number }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: reveal }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2, ease: "linear" }}
+      transition={{ duration: 0.25, ease: "linear" }}
       pointerEvents="none"
+      shapeRendering="crispEdges"
     >
-      {/* survey ground */}
-      <rect x="-152" y="-136" width="304" height="272" rx="3" fill="var(--muted)" opacity="0.5" />
-      {terrain.coastal && (
-        <path d="M-152 96 C-96 84 -42 112 10 100 C64 88 110 116 152 104 L152 136 L-152 136 Z" fill="var(--page)" opacity="0.9" />
-      )}
-      {contours.map(({ d, index }) => (
-        <path
-          key={index}
-          d={d}
-          fill="none"
-          stroke="var(--primary)"
-          strokeOpacity={index % 4 === 0 ? 0.5 : 0.22}
-          strokeWidth={index % 4 === 0 ? 0.9 : 0.5}
-        />
+      {cells.map((c, i) => (
+        <rect key={i} x={c.x} y={c.y} width={7} height={7} fill={c.fill} />
       ))}
-
-      {/* access road */}
-      <path
-        d={`M-152 ${(40 + (seed % 17)).toFixed(0)} C-80 ${(20 + (seed % 11)).toFixed(0)} -30 60 8 44 C48 27 96 40 152 18`}
-        fill="none"
-        stroke="var(--foreground)"
-        strokeOpacity="0.4"
-        strokeWidth="1.6"
-        strokeDasharray="6 4"
-      />
-
-      {/* turbine array on the exposed ridge */}
-      {turbines.map((t, i) => (
-        <g key={i} transform={`translate(${t.x.toFixed(1)} ${t.y.toFixed(1)})`}>
-          <circle r="13" fill="none" stroke="var(--primary)" strokeOpacity="0.28" strokeWidth="0.5" />
-          <line y1="0" y2="-9" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.9" />
-          <line x1="0" y1="-9" x2="0" y2="-16" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
-          <line x1="0" y1="-9" x2="6.5" y2="-5" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
-          <line x1="0" y1="-9" x2="-6.5" y2="-5" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
-        </g>
-      ))}
-
-      {/* PV field on the gentle south-facing slope */}
-      <g transform="translate(-134 46)">
-        {Array.from({ length: panelRows * 10 }, (_, i) => (
+      <g shapeRendering="auto">
+        {contours.map((c, i) => (
           <rect
-            key={i}
-            x={(i % 10) * 9.4}
-            y={Math.floor(i / 10) * 7.4}
-            width="7"
-            height="4.2"
+            key={`c${i}`}
+            x={c.x}
+            y={c.y}
+            width={c.w}
+            height={c.hgt}
             fill="var(--primary)"
-            opacity="0.6"
+            opacity={c.major ? 0.3 : 0.13}
           />
         ))}
       </g>
-
-      {/* data halls on the graded pad */}
-      <g transform="translate(56 62)">
-        <rect x="-42" y="-20" width="84" height="42" rx="1.5" fill="var(--foreground)" opacity="0.16" />
-        {[0, 1, 2].map((i) => (
-          <rect key={i} x={-36 + i * 25} y="-14" width="21" height="30" fill="var(--foreground)" opacity="0.78" />
-        ))}
-        <rect x="-36" y="20" width="72" height="3" fill="var(--primary)" opacity="0.5" />
-      </g>
-
-      {/* survey frame, scale bar, north arrow */}
-      <rect x="-152" y="-136" width="304" height="272" fill="none" stroke="var(--primary)" strokeOpacity="0.4" strokeWidth="0.8" strokeDasharray="4 5" />
-      <g transform="translate(-144 126)">
-        <line x1="0" y1="0" x2="48" y2="0" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
-        <line x1="0" y1="-3" x2="0" y2="3" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
-        <line x1="48" y1="-3" x2="48" y2="3" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
-        <text x="0" y="-5" fill="var(--foreground)" fillOpacity="0.65" fontSize="6" letterSpacing="0.6">1 km</text>
-      </g>
-      <g transform="translate(138 -122)">
-        <path d="M0 -10 L4 6 L0 2 L-4 6 Z" fill="var(--primary)" opacity="0.8" />
-        <text x="-2.6" y="16" fill="var(--foreground)" fillOpacity="0.6" fontSize="6.5">N</text>
-      </g>
-      <text x="-150" y="-142" fill="var(--foreground)" fillOpacity="0.55" fontSize="6.5" letterSpacing="1">
+      <rect x="-150" y="-150" width="300" height="300" fill="none" stroke="var(--primary)" strokeOpacity="0.35" strokeWidth="0.7" strokeDasharray="4 6" />
+      <text x="-150" y="-156" fill="var(--foreground)" fillOpacity="0.6" fontSize="6.5" letterSpacing="1">
         {site.nom.toUpperCase()} · 6 KM SURVEY · {terrain.landform.replace("-", " ").toUpperCase()} · {terrain.relief} M RELIEF
       </text>
+      <g transform="translate(-146 142)">
+        <line x1="0" y1="0" x2="50" y2="0" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="0.9" />
+        <text x="0" y="-4" fill="var(--foreground)" fillOpacity="0.6" fontSize="6">1 km</text>
+      </g>
     </motion.g>
   );
 }
