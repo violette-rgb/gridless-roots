@@ -397,7 +397,28 @@ export function WorldMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---------- imperative API for the page chrome ---------- */
+
+  useEffect(() => {
+    onReady?.({
+      goToGlobe: () => {
+        if (dwell.current) window.clearTimeout(dwell.current);
+        if (climb.current) window.clearTimeout(climb.current);
+        focus.current = null;
+        goToLevel(0, null, true);
+        onStageRef.current?.("globe", null);
+      },
+      flyToSite: (s: Site) => {
+        if (dwell.current) window.clearTimeout(dwell.current);
+        if (climb.current) window.clearTimeout(climb.current);
+        goToLevel(3, s, true);
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goToLevel]);
+
   /* ---------- hover styling ---------- */
+
 
   useEffect(() => {
     markers.current.forEach(({ el }, id) => {
