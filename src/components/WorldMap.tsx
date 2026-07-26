@@ -1,18 +1,39 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useRef } from "react";
+import type { Map as MLMap, Marker as MLMarker } from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import {
-  type GrilleAxes,
+  VERDICT_COLOR,
   siteVerdict,
   referenceLolp,
   formatLolp,
-  VERDICT_COLOR,
+  type GrilleAxes,
   type Site,
 } from "@/lib/offgrid-data";
-import { terrainFor, heightAt, waterLevel, seedOf } from "@/lib/terrain";
+import { buildSiteGeoJSON, type BuildSpec } from "@/lib/site-model";
 
 export type ZoomStage = "globe" | "country" | "city" | "site";
+
+const LEVELS: { zoom: number; pitch: number; stage: ZoomStage }[] = [
+  { zoom: 1.5, pitch: 0, stage: "globe" },
+  { zoom: 5, pitch: 0, stage: "country" },
+  { zoom: 9, pitch: 45, stage: "city" },
+  { zoom: 13.5, pitch: 65, stage: "site" },
+];
+
+const DEM_SOURCE = "terrain-dem";
+const MODEL_LAYERS: {
+  id: string;
+  key: "halls" | "batteries" | "solar" | "turbines";
+  height: number;
+  base: number;
+  color: string;
+  opacity: number;
+}[] = [
+  { id: "site-halls", key: "halls", height: 22, base: 0, color: "#c8cfe0", opacity: 0.9 },
+  { id: "site-batteries", key: "batteries", height: 4, base: 0, color: "#8fa3b8", opacity: 0.9 },
+  { id: "site-solar", key: "solar", height: 1.5, base: 0, color: "#1b3a5c", opacity: 0.85 },
+  { id: "site-turbines", key: "turbines", height: 110, base: 0, color: "#e8edf5", opacity: 0.95 },
+];
 
 interface Props {
   sites: Site[];
@@ -21,561 +42,313 @@ interface Props {
   hoveredId: string | null;
   onHover: (id: string | null) => void;
   onSelect: (site: Site) => void;
-  panelOpen: boolean;
-  onApproach?: (id: string | null) => void;
-  approachedId?: string | null;
-  onZoomStageChange?: (stage: ZoomStage, siteId: string | null) => void;
+  build: BuildSpec;
+  onStageChange?: (stage: ZoomStage, siteId: string | null) => void;
 }
 
-type CountryGeometry = {
-  type: "Polygon" | "MultiPolygon";
-  coordinates: number[][][] | number[][][][];
-};
-
-type CountryFeature = {
-  type: "Feature";
-  properties: { name?: string };
-  geometry: CountryGeometry;
-};
-
-type CountryCollection = {
-  type: "FeatureCollection";
-  features: CountryFeature[];
-};
-
-type ViewState = { lon: number; lat: number; progress: number };
-type ProjectedPoint = { x: number; y: number; visible: boolean; shade: number };
-type TransformState = { x: number; y: number; scale: number };
-
-const RAD = Math.PI / 180;
-const HOME: [number, number] = [10, 50];
-const SVG_SIZE = 1000;
-const CX = 520;
-const CY = 500;
-const HOME_R = 286;
-const HOME_VIEW: ViewState = { lon: HOME[0], lat: HOME[1], progress: 0 };
-const SITE_SCALE = 42;
-/** Half-width of the survey square in globe units; ~12 units wide once on screen. */
-const PLAN_HALF = 6;
-
-function projectPoint(lon: number, lat: number, view: ViewState): ProjectedPoint {
-  const radius = HOME_R;
-  const lambda = (lon - view.lon) * RAD;
-  const phi = lat * RAD;
-  const phi0 = view.lat * RAD;
-  const cosPhi = Math.cos(phi);
-  const x = CX + radius * cosPhi * Math.sin(lambda);
-  const y = CY - radius * (Math.cos(phi0) * Math.sin(phi) - Math.sin(phi0) * cosPhi * Math.cos(lambda));
-  const shade = Math.sin(phi0) * Math.sin(phi) + Math.cos(phi0) * cosPhi * Math.cos(lambda);
-  return { x, y, visible: shade > -0.04, shade };
-}
-
-function ringPath(ring: number[][], view: ViewState) {
-  const parts: string[] = [];
-  let open = false;
-  let points = 0;
-  for (const point of ring) {
-    const lon = point[0];
-    const lat = point[1];
-    if (typeof lon !== "number" || typeof lat !== "number") continue;
-    const p = projectPoint(lon, lat, view);
-    if (!p.visible) {
-      open = false;
-      continue;
-    }
-    parts.push(`${open ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`);
-    open = true;
-    points += 1;
-  }
-  if (points > 2) parts.push("Z");
-  return parts.join(" ");
-}
-
-function geometryPath(geometry: CountryGeometry, view: ViewState) {
-  const polygons = geometry.type === "Polygon" ? [geometry.coordinates as number[][][]] : (geometry.coordinates as number[][][][]);
-  return polygons
-    .map((polygon) => polygon.map((ring) => ringPath(ring, view)).join(" "))
-    .filter(Boolean)
-    .join(" ");
-}
-
-function sampledLinePath(points: [number, number][], view: ViewState) {
-  let path = "";
-  let open = false;
-  for (const [lon, lat] of points) {
-    const p = projectPoint(lon, lat, view);
-    if (!p.visible) {
-      open = false;
-      continue;
-    }
-    path += `${open ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)} `;
-    open = true;
-  }
-  return path.trim();
-}
-
-function useCountries() {
-  const [countries, setCountries] = useState<CountryCollection | null>(null);
-  useEffect(() => {
-    let alive = true;
-    fetch("/world-countries.geo.json")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (alive && json?.type === "FeatureCollection") setCountries(json as CountryCollection);
-      })
-      .catch((error) => console.error("[globe] local country outlines failed", error));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return countries;
-}
-
-function easeInOut(t: number) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-/**
- * Cinematic camera tween. Runs entirely off React state: every frame is written
- * straight to the DOM, so the globe never re-renders mid-flight.
- */
-function useCameraTween(
-  target: TransformState,
-  apply: (t: TransformState, reveal: number, depth: number) => void,
-) {
-  const currentRef = useRef<TransformState>(target);
-  const applyRef = useRef(apply);
-  applyRef.current = apply;
-
-  useEffect(() => {
-    const from = currentRef.current;
-    const duration =
-      Math.abs(Math.log(target.scale / from.scale)) > 0.05 ? 1900 : 900;
-    const start = performance.now();
-    let raf = 0;
-
-    const tick = (now: number) => {
-      const p = Math.min(1, (now - start) / duration);
-      const e = easeInOut(p);
-      // zoom interpolates geometrically so the descent feels linear in altitude
-      const scale = from.scale * Math.pow(target.scale / from.scale, e);
-      const next = {
-        x: from.x + (target.x - from.x) * e,
-        y: from.y + (target.y - from.y) * e,
-        scale,
-      };
-      currentRef.current = next;
-      // only surface the survey in the last stretch of the descent
-      const p2 = Math.log(Math.max(1, scale)) / Math.log(SITE_SCALE);
-      const reveal = Math.max(0, Math.min(1, (p2 - 0.72) / 0.26));
-      applyRef.current(next, reveal, p2);
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target.x, target.y, target.scale]);
-}
-
-
-function Graticule() {
-  const paths = useMemo(() => {
-    const result: [number, number][][] = [];
-    for (let lon = -180; lon <= 180; lon += 15) result.push(Array.from({ length: 73 }, (_, i) => [lon, -90 + i * 2.5] as [number, number]));
-    for (let lat = -75; lat <= 75; lat += 15) result.push(Array.from({ length: 145 }, (_, i) => [-180 + i * 2.5, lat] as [number, number]));
-    return result.map((line) => sampledLinePath(line, HOME_VIEW)).filter(Boolean);
-  }, []);
-  return (
-    <g opacity="0.13">
-      {paths.map((d, index) => (
-        <path key={index} d={d} fill="none" stroke="var(--primary)" strokeWidth={0.9} vectorEffect="non-scaling-stroke" />
-      ))}
-    </g>
-  );
-}
-
-function CountryLayer({ countries }: { countries: CountryCollection | null }) {
-  const paths = useMemo(
-    () =>
-      (countries?.features ?? [])
-        .map((feature, index) => ({
-          id: `${feature.properties.name ?? "country"}-${index}`,
-          d: geometryPath(feature.geometry, HOME_VIEW),
-        }))
-        .filter((item) => item.d),
-    [countries],
-  );
-
-  return (
-    <g>
-      {paths.map(({ id, d }) => (
-        <path
-          key={id}
-          d={d}
-          fill="var(--muted)"
-          fillOpacity="0.72"
-          stroke="var(--foreground)"
-          strokeOpacity="0.34"
-          strokeWidth="0.8"
-          vectorEffect="non-scaling-stroke"
-        />
-      ))}
-    </g>
-  );
-}
-
-
-/** Pure topographic zoom of the selected zone — relief only, no schematic overlay. */
-function SiteTerrainPlan({ site }: { site: Site }) {
-  const center = projectPoint(site.longitude, site.latitude, HOME_VIEW);
-  const terrain = terrainFor(site.id, site.latitude);
-  const seed = seedOf(site.id);
-
-  /** Rendered once into an offscreen canvas — one <image> node, no per-frame cost. */
-  const topo = useMemo(() => {
-    if (typeof document === "undefined") return null;
-    const N = 320;
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = N;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    const img = ctx.createImageData(N, N);
-    const wl = waterLevel(terrain);
-    const bands = 18;
-
-    const h = new Float32Array(N * N);
-    for (let y = 0; y < N; y += 1) {
-      for (let x = 0; x < N; x += 1) {
-        h[y * N + x] = heightAt((x / (N - 1)) * 2 - 1, (y / (N - 1)) * 2 - 1, terrain, seed);
-      }
-    }
-
-    for (let y = 0; y < N; y += 1) {
-      for (let x = 0; x < N; x += 1) {
-        const i = y * N + x;
-        const v = h[i];
-        const band = Math.floor(v * bands);
-        const right = x < N - 1 ? Math.floor(h[i + 1] * bands) : band;
-        const down = y < N - 1 ? Math.floor(h[i + N] * bands) : band;
-        const isContour = band !== right || band !== down;
-        const major = band % 4 === 0;
-        // hillshade from the local gradient, lit from the north-west
-        const gx = (x < N - 1 ? h[i + 1] : v) - (x > 0 ? h[i - 1] : v);
-        const gy = (y < N - 1 ? h[i + N] : v) - (y > 0 ? h[i - N] : v);
-        const shade = Math.max(0.35, Math.min(1.35, 1 - (gx + gy) * 6));
-
-        let r = (5 + v * 26) * shade;
-        let g = (11 + v * 44) * shade;
-        let b = (19 + v * 62) * shade;
-
-        if (wl !== null && v < wl) {
-          r = 4;
-          g = 14;
-          b = 28;
-        } else if (isContour) {
-          const k = major ? 1 : 0.4;
-          r += 26 * k;
-          g += 66 * k;
-          b += 82 * k;
-        }
-
-        const o = i * 4;
-        img.data[o] = Math.min(255, r);
-        img.data[o + 1] = Math.min(255, g);
-        img.data[o + 2] = Math.min(255, b);
-        img.data[o + 3] = 255;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    return canvas.toDataURL("image/png");
-  }, [terrain, seed]);
-
-  const H = PLAN_HALF;
-  const K = H / 150; // scale factor from the plan's internal 300-unit box
-
-  return (
-    <g transform={`translate(${center.x} ${center.y})`} pointerEvents="none">
-      {topo && (
-        <image href={topo} x={-H} y={-H} width={H * 2} height={H * 2} preserveAspectRatio="none" />
-      )}
-
-      <rect
-        x={-H}
-        y={-H}
-        width={H * 2}
-        height={H * 2}
-        fill="none"
-        stroke="var(--primary)"
-        strokeOpacity="0.35"
-        strokeWidth="1"
-        strokeDasharray="5 7"
-        vectorEffect="non-scaling-stroke"
-      />
-      <text
-        x={-H}
-        y={-H - 4 * K}
-        fill="var(--foreground)"
-        fillOpacity="0.65"
-        fontSize={6.5 * K}
-        letterSpacing={K}
-      >
-        {site.nom.toUpperCase()} · 6 KM SURVEY · {terrain.landform.replace("-", " ").toUpperCase()} · {terrain.relief} M RELIEF
-      </text>
-      <g transform={`translate(${-H + 4 * K} ${H - 8 * K})`}>
-        <line
-          x1="0"
-          y1="0"
-          x2={50 * K}
-          y2="0"
-          stroke="var(--foreground)"
-          strokeOpacity="0.7"
-          strokeWidth="1"
-          vectorEffect="non-scaling-stroke"
-        />
-        <text x="0" y={-3 * K} fill="var(--foreground)" fillOpacity="0.6" fontSize={6 * K}>
-          1 km
-        </text>
-      </g>
-    </g>
-  );
-
-}
-
-
-function MarkerLayer({
+export function WorldMap({
   sites,
-  hoveredId,
+  axes,
   selectedId,
-  approachedId,
+  hoveredId,
   onHover,
   onSelect,
-  panelOpen,
-}: Pick<Props, "sites" | "hoveredId" | "selectedId" | "approachedId" | "onHover" | "onSelect" | "panelOpen">) {
-  const focusId = selectedId ?? hoveredId;
-  return (
-    <g>
-      {sites.map((site) => {
-        const p = projectPoint(site.longitude, site.latitude, HOME_VIEW);
-        if (!p.visible) return null;
-        const color = VERDICT_COLOR[siteVerdict(site)];
-        const isHovered = hoveredId === site.id;
-        const isSelected = selectedId === site.id;
-        const isFocus = focusId === site.id;
-        const dimmed = Boolean((focusId && !isFocus) || (panelOpen && !isSelected));
-        const r = isHovered || isSelected ? 10 : 6;
-        return (
-          <g key={site.id} opacity={dimmed ? 0.18 : 1} pointerEvents={focusId && !isFocus ? "none" : "auto"}>
-            <circle cx={p.x} cy={p.y} r={r * 3.1} fill={color} opacity={isHovered ? 0.16 : 0.07} />
-            <circle cx={p.x} cy={p.y} r={r * 1.7} fill="none" stroke={color} strokeOpacity="0.42" strokeWidth="1.4" />
-            <circle
-              cx={p.x}
-              cy={p.y}
-              r={r}
-              fill={color}
-              stroke="var(--page)"
-              strokeWidth="2.5"
-              className="cursor-pointer"
-              onPointerEnter={() => {
-                if (!focusId || isFocus) onHover(site.id);
-              }}
-              onClick={() => {
-                onHover(site.id);
-                onSelect(site);
-              }}
-            />
-            <circle
-              cx={p.x}
-              cy={p.y}
-              r="24"
-              fill="transparent"
-              className="cursor-pointer"
-              onPointerEnter={() => {
-                if (!focusId || isFocus) onHover(site.id);
-              }}
-              onClick={() => {
-                onHover(site.id);
-                onSelect(site);
-              }}
-            />
-            {isHovered && approachedId !== site.id && <circle cx={p.x} cy={p.y} r="34" fill="none" stroke={color} strokeOpacity="0.28" strokeWidth="1.2" />}
-          </g>
-        );
-      })}
-    </g>
-  );
-}
+  build,
+  onStageChange,
+}: Props) {
+  const container = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MLMap | null>(null);
+  const markers = useRef<Map<string, { marker: MLMarker; el: HTMLDivElement }>>(new Map());
+  const level = useRef(0);
+  const focus = useRef<string | null>(null);
+  const flying = useRef(false);
+  const terrainOn = useRef(false);
+  const dwell = useRef<number | null>(null);
+  const climb = useRef<number | null>(null);
+  const spinTarget = useRef(3);
+  const sitesRef = useRef(sites);
+  sitesRef.current = sites;
+  const buildRef = useRef(build);
+  buildRef.current = build;
+  const onHoverRef = useRef(onHover);
+  onHoverRef.current = onHover;
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const onStageRef = useRef(onStageChange);
+  onStageRef.current = onStageChange;
 
-export function WorldMap(props: Props) {
-  const { sites, selectedId, hoveredId, approachedId, onHover, onSelect, panelOpen, onApproach, onZoomStageChange } = props;
-  const countries = useCountries();
-  const focusId = selectedId ?? hoveredId;
-  const focus = focusId ? sites.find((site) => site.id === focusId) ?? null : null;
-  const focusPoint = focus ? projectPoint(focus.longitude, focus.latitude, HOME_VIEW) : null;
-  const scale = focus ? SITE_SCALE : 1;
-  const mapX = focusPoint ? CX - focusPoint.x * scale : 0;
-  const mapY = focusPoint ? CY - focusPoint.y * scale : 0;
+  /* ---------- level 4: terrain + the site model ---------- */
 
-  const cameraRef = useRef<SVGGElement | null>(null);
-  const planRef = useRef<SVGGElement | null>(null);
-  const markersRef = useRef<SVGGElement | null>(null);
-  const shadeRef = useRef<SVGCircleElement | null>(null);
-
-  const applyCamera = useCallback((t: TransformState, reveal: number, depth: number) => {
-    if (cameraRef.current) {
-      cameraRef.current.setAttribute(
-        "transform",
-        `matrix(${t.scale} 0 0 ${t.scale} ${t.x} ${t.y})`,
-      );
+  const enableSite = useCallback((site: Site) => {
+    const m = mapRef.current;
+    if (!m) return;
+    if (!m.getSource(DEM_SOURCE)) {
+      m.addSource(DEM_SOURCE, {
+        type: "raster-dem",
+        tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+        encoding: "terrarium",
+        tileSize: 256,
+        maxzoom: 15,
+      });
     }
-    if (planRef.current) planRef.current.setAttribute("opacity", reveal.toFixed(3));
-    // the globe shading only reads at globe scale — lift it as the camera descends
-    if (shadeRef.current) shadeRef.current.setAttribute("opacity", Math.max(0, 1 - depth * 2.2).toFixed(3));
-    if (markersRef.current) {
-      markersRef.current.setAttribute("opacity", (1 - reveal * 0.96).toFixed(3));
-      markersRef.current.style.pointerEvents = reveal > 0.6 ? "none" : "auto";
+    m.setTerrain({ source: DEM_SOURCE, exaggeration: 1.6 });
+    if (!m.getLayer("hillshade")) {
+      m.addLayer({
+        id: "hillshade",
+        type: "hillshade",
+        source: DEM_SOURCE,
+        paint: {
+          "hillshade-exaggeration": 0.6,
+          "hillshade-shadow-color": "#000000",
+          "hillshade-highlight-color": "#1e3a4a",
+        },
+      });
     }
+
+    const geo = buildSiteGeoJSON(site, buildRef.current);
+    for (const l of MODEL_LAYERS) {
+      const data = geo[l.key] as unknown as GeoJSON.FeatureCollection;
+      const src = m.getSource(l.id) as maplibregl.GeoJSONSource | undefined;
+      if (src) {
+        src.setData(data);
+      } else {
+        m.addSource(l.id, { type: "geojson", data });
+        m.addLayer({
+          id: l.id,
+          type: "fill-extrusion",
+          source: l.id,
+          paint: {
+            "fill-extrusion-color": l.color,
+            "fill-extrusion-height": l.height,
+            "fill-extrusion-base": l.base,
+            "fill-extrusion-opacity": l.opacity,
+          },
+        });
+      }
+    }
+    terrainOn.current = true;
   }, []);
 
-  useCameraTween({ x: mapX, y: mapY, scale }, applyCamera);
+  const disableSite = useCallback(() => {
+    const m = mapRef.current;
+    if (!m || !terrainOn.current) return;
+    m.setTerrain(null);
+    if (m.getLayer("hillshade")) m.removeLayer("hillshade");
+    for (const l of MODEL_LAYERS) {
+      if (m.getLayer(l.id)) m.removeLayer(l.id);
+      if (m.getSource(l.id)) m.removeSource(l.id);
+    }
+    terrainOn.current = false;
+  }, []);
 
+  /* ---------- camera ---------- */
+
+  const goToLevel = useCallback(
+    (n: number, site: Site | null) => {
+      const m = mapRef.current;
+      if (!m || flying.current) return;
+      const lv = Math.max(0, Math.min(3, n));
+      const target = LEVELS[lv];
+      if (lv > 0 && !site) return;
+      if (lv < 3) disableSite();
+      flying.current = true;
+      level.current = lv;
+      focus.current = lv > 0 && site ? site.id : null;
+      spinTarget.current = lv === 0 ? 3 : 0;
+      onStageRef.current?.(target.stage, focus.current);
+      m.flyTo({
+        center: site && lv > 0 ? [site.longitude, site.latitude] : m.getCenter(),
+        zoom: target.zoom,
+        pitch: target.pitch,
+        bearing: 0,
+        duration: 2000,
+        curve: 1.4,
+        essential: true,
+      });
+      const done = () => {
+        flying.current = false;
+        if (lv === 3 && site) enableSite(site);
+      };
+      m.once("moveend", done);
+      window.setTimeout(done, 2400);
+    },
+    [disableSite, enableSite],
+  );
+
+  /* ---------- map bootstrap ---------- */
 
   useEffect(() => {
-    if (!focus) {
-      onApproach?.(null);
-      onZoomStageChange?.("globe", null);
-      return;
+    let disposed = false;
+    let map: MLMap | null = null;
+    let raf = 0;
+
+    (async () => {
+      const maplibregl = await import("maplibre-gl");
+      if (disposed || !container.current) return;
+      map = new maplibregl.Map({
+        container: container.current,
+        style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+        center: [10, 25],
+        zoom: 1.5,
+        pitch: 0,
+        attributionControl: false,
+        projection: { type: "globe" },
+      });
+      mapRef.current = map;
+      map.on("error", (e) => console.error("[map]", e?.error ?? e));
+      map.dragRotate.disable();
+
+      map.on("load", () => {
+        if (!map) return;
+        map.resize();
+        try {
+          map.setSky({
+            "sky-color": "#05070a",
+            "horizon-color": "#0d2635",
+            "fog-color": "#07090C",
+            "fog-ground-blend": 0.4,
+            "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 6, 0],
+          });
+        } catch {
+          /* sky unsupported */
+        }
+
+        // markers
+        for (const s of sitesRef.current) {
+          const color = VERDICT_COLOR[siteVerdict(s)];
+          const el = document.createElement("div");
+          el.className = "site-marker";
+          el.style.setProperty("--mk", color);
+          el.style.setProperty("--phase", `${(Math.abs(s.latitude * 7) % 40) / 10}s`);
+          el.innerHTML = `<span class="site-marker__ring"></span><span class="site-marker__dot"></span>
+            <span class="site-marker__label"><span class="site-marker__line"></span>
+              <span class="site-marker__text"><em>${s.nom}</em><i>${s.pays}</i>
+              <b>${formatLolp(referenceLolp(axes, s))}%</b></span></span>`;
+          el.addEventListener("pointerenter", () => {
+            onHoverRef.current(s.id);
+            spinTarget.current = 0;
+            if (climb.current) window.clearTimeout(climb.current);
+            if (dwell.current) window.clearTimeout(dwell.current);
+            dwell.current = window.setTimeout(() => {
+              goToLevel(level.current + 1, s);
+            }, 400);
+          });
+          el.addEventListener("pointerleave", () => {
+            if (dwell.current) window.clearTimeout(dwell.current);
+            if (climb.current) window.clearTimeout(climb.current);
+            climb.current = window.setTimeout(() => {
+              onHoverRef.current(null);
+              const s2 = focus.current
+                ? (sitesRef.current.find((x) => x.id === focus.current) ?? null)
+                : null;
+              goToLevel(level.current - 1, level.current - 1 > 0 ? s2 : null);
+            }, 800);
+          });
+          el.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            if (dwell.current) window.clearTimeout(dwell.current);
+            onHoverRef.current(s.id);
+            onSelectRef.current(s);
+            goToLevel(3, s);
+          });
+          const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+            .setLngLat([s.longitude, s.latitude])
+            .addTo(map);
+          markers.current.set(s.id, { marker, el });
+        }
+      });
+
+      map.on("mousedown", () => {
+        spinTarget.current = 0;
+        if (dwell.current) window.clearTimeout(dwell.current);
+      });
+      map.on("mousemove", () => {
+        if (dwell.current) window.clearTimeout(dwell.current);
+      });
+
+      // autorotation
+      let lastT = performance.now();
+      let speed = 3;
+      const reduce =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const spin = (now: number) => {
+        const dt = Math.min((now - lastT) / 1000, 0.1);
+        lastT = now;
+        if (map && !flying.current) {
+          const t = map.getZoom() >= 3.5 || level.current > 0 ? 0 : spinTarget.current;
+          speed += (t - speed) * Math.min(dt * 2.5, 1);
+          if (speed > 0.01) {
+            const c = map.getCenter();
+            c.lng -= dt * speed;
+            map.jumpTo({ center: c });
+          }
+        }
+        raf = requestAnimationFrame(spin);
+      };
+      if (!reduce) raf = requestAnimationFrame(spin);
+    })();
+
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(raf);
+      if (dwell.current) window.clearTimeout(dwell.current);
+      if (climb.current) window.clearTimeout(climb.current);
+      markers.current.forEach(({ marker }) => marker.remove());
+      markers.current.clear();
+      map?.remove();
+      mapRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ---------- hover styling ---------- */
+
+  useEffect(() => {
+    markers.current.forEach(({ el }, id) => {
+      const active = id === hoveredId || id === selectedId;
+      el.classList.toggle("is-active", active);
+      el.classList.toggle("is-dim", !!(hoveredId || selectedId) && !active);
+    });
+  }, [hoveredId, selectedId]);
+
+  /* ---------- external hover (site rail) descends too ---------- */
+
+  useEffect(() => {
+    if (!hoveredId) return;
+    const s = sitesRef.current.find((x) => x.id === hoveredId);
+    if (!s) return;
+    if (focus.current === hoveredId) return;
+    const id = window.setTimeout(() => goToLevel(Math.max(1, level.current), s), 120);
+    return () => window.clearTimeout(id);
+  }, [hoveredId, goToLevel]);
+
+  /* ---------- slider changes rebuild the model in place ---------- */
+
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m || !terrainOn.current || !focus.current) return;
+    const s = sitesRef.current.find((x) => x.id === focus.current);
+    if (!s) return;
+    const geo = buildSiteGeoJSON(s, build);
+    for (const l of MODEL_LAYERS) {
+      const src = m.getSource(l.id) as { setData?: (d: unknown) => void } | undefined;
+      src?.setData?.(geo[l.key]);
     }
+  }, [build]);
 
-    onApproach?.(null);
-    onZoomStageChange?.("country", focus.id);
-    const timers = [
-      window.setTimeout(() => onZoomStageChange?.("city", focus.id), 700),
-      window.setTimeout(() => onZoomStageChange?.("site", focus.id), 1450),
-      // the 3D maquette only mounts once the camera has fully settled
-      window.setTimeout(() => onApproach?.(focus.id), 2050),
-    ];
+  /* ---------- selection flies to the site ---------- */
 
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [focus, onApproach, onZoomStageChange]);
-
-  const resetToGlobe = useCallback(() => {
-    onHover(null);
-    onApproach?.(null);
-    onZoomStageChange?.("globe", null);
-  }, [onApproach, onHover, onZoomStageChange]);
+  useEffect(() => {
+    if (!selectedId) return;
+    const s = sitesRef.current.find((x) => x.id === selectedId);
+    if (s && focus.current !== selectedId) goToLevel(3, s);
+  }, [selectedId, goToLevel]);
 
   return (
-    <div className="absolute inset-0 bg-page">
-      <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`} role="img" aria-label="Interactive off-grid site globe">
-        <defs>
-          <radialGradient id="globeOcean" cx="38%" cy="32%" r="68%">
-            <stop offset="0%" stopColor="var(--muted)" stopOpacity="0.98" />
-            <stop offset="48%" stopColor="var(--background)" stopOpacity="0.96" />
-            <stop offset="100%" stopColor="var(--page)" stopOpacity="1" />
-          </radialGradient>
-          <radialGradient id="globeShade" cx="32%" cy="28%" r="76%">
-            <stop offset="0%" stopColor="white" stopOpacity="0.14" />
-            <stop offset="54%" stopColor="var(--primary)" stopOpacity="0.03" />
-            <stop offset="100%" stopColor="black" stopOpacity="0.46" />
-          </radialGradient>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="8" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        <rect width="1000" height="1000" fill="var(--page)" />
-        <g ref={cameraRef} transform="matrix(1 0 0 1 0 0)">
-          <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeOcean)" filter="url(#glow)" opacity="0.95" />
-          <Graticule />
-          <CountryLayer countries={countries} />
-          <g ref={planRef} opacity="0" pointerEvents="none">
-            {focus && <SiteTerrainPlan key={focus.id} site={focus} />}
-          </g>
-          <circle ref={shadeRef} cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
-          <circle cx={CX} cy={CY} r={HOME_R} fill="none" stroke="var(--primary)" strokeOpacity="0.2" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
-
-          <g ref={markersRef} opacity="1">
-            <MarkerLayer
-              sites={sites}
-              hoveredId={hoveredId}
-              selectedId={selectedId}
-              approachedId={approachedId}
-              onHover={onHover}
-              onSelect={onSelect}
-              panelOpen={panelOpen}
-            />
-          </g>
-
-        </g>
-      </svg>
-
-      <div className="vignette pointer-events-none absolute inset-0" />
-      <div className="absolute right-6 top-24 z-40 flex items-center gap-2 md:right-10">
-        <Button type="button" variant="outline" size="icon" onClick={resetToGlobe} aria-label="Return to globe" title="Return to globe" className="rounded-full border-primary/35 bg-background/55 text-primary backdrop-blur-xl hover:bg-primary/10">
-          <RotateCcw aria-hidden="true" />
-        </Button>
-      </div>
-
-      {/* Hover readout — fixed HUD, never follows the cursor */}
-      <AnimatePresence>
-        {focus && (
-          <motion.div
-            key={focus.id}
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="panel pointer-events-none absolute right-6 top-40 z-40 w-[236px] px-4 py-3 md:right-10"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <div className="text-[13px] font-light">{focus.nom}</div>
-              <div className="label-xs">{focus.pays}</div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span
-                className="num text-[28px] leading-none"
-                style={{ color: VERDICT_COLOR[siteVerdict(focus)] }}
-              >
-                {formatLolp(referenceLolp(props.axes, focus))}%
-              </span>
-              <span className="label-xs">LOLP · ref. build</span>
-            </div>
-            <dl className="mt-3 space-y-1.5 border-t border-hairline pt-3">
-              <Readout label="Wind 100 m" value={`${focus.indicateurs.vent_100m_ms.toFixed(1)} m/s`} />
-              <Readout label="Irradiance" value={`${Math.round(focus.indicateurs.irradiance_wm2)} W/m²`} />
-              <Readout label="Air temp" value={`${focus.indicateurs.temperature_c.toFixed(1)} °C`} />
-              <Readout label="Mean PUE" value={focus.indicateurs.pue_moyen.toFixed(3)} />
-              <Readout label="Landform" value={terrainFor(focus.id, focus.latitude).landform.replace("-", " ")} />
-            </dl>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-
-      <AnimatePresence>
-        {!hoveredId && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="pointer-events-none absolute bottom-28 left-1/2 z-20 w-[min(520px,calc(100vw-380px))] -translate-x-1/2 text-center text-[12px] font-light leading-relaxed text-foreground/62"
-          >
-            Local globe · no external map tiles. Hover a candidate to descend from continent to site plan.
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-function Readout({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="label-xs">{label}</dt>
-      <dd className="num text-[12px] text-foreground/85">{value}</dd>
+    <div className="absolute inset-0">
+      <div ref={container} className="h-full w-full" />
+      <div className="map-vignette pointer-events-none absolute inset-0" />
     </div>
   );
 }
