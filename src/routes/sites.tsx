@@ -2,9 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useState } from "react";
-import { WorldMap, type ZoomStage } from "@/components/WorldMap";
+import { WorldMap, type MapApi, type ZoomStage } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
-import { SiteMaquette3D } from "@/components/SiteMaquette3D";
+import { SiteMaquette3D, siteArchetype } from "@/components/SiteMaquette3D";
 import { Button } from "@/components/ui/button";
 import { useHydrated } from "@/lib/hooks";
 import type { BuildSpec } from "@/lib/site-model";
@@ -55,6 +55,8 @@ function SitesPage() {
   const [stage, setStage] = useState<ZoomStage>("globe");
   const [maquetteOpen, setMaquetteOpen] = useState(false);
   const [stageSiteId, setStageSiteId] = useState<string | null>(null);
+  const [railOpen, setRailOpen] = useState(false);
+  const [api, setApi] = useState<MapApi | null>(null);
   const [build, setBuild] = useState<BuildSpec>({
     turbines: REFERENCE_BUILD.turbines,
     pv_mw: REFERENCE_BUILD.pv_mw,
@@ -66,7 +68,32 @@ function SitesPage() {
     setStageSiteId(siteId);
   }, []);
   const onBuild = useCallback((b: BuildSpec) => setBuild(b), []);
+  const onReady = useCallback((a: MapApi) => setApi(a), []);
   const stageSite = stageSiteId ? (data?.sites.find((s) => s.id === stageSiteId) ?? null) : null;
+  const current = selected ?? stageSite;
+
+  const ordered = data?.sites ?? [];
+  const goToGlobe = useCallback(() => {
+    setSelected(null);
+    setHovered(null);
+    setMaquetteOpen(false);
+    setStage("globe");
+    setStageSiteId(null);
+    api?.goToGlobe();
+  }, [api]);
+  const step = useCallback(
+    (dir: 1 | -1) => {
+      if (!ordered.length) return;
+      const i = current ? ordered.findIndex((s) => s.id === current.id) : -1;
+      const next = ordered[(i + dir + ordered.length) % ordered.length];
+      setHovered(next.id);
+      setSelected(next);
+      api?.flyToSite(next);
+    },
+    [api, current, ordered],
+  );
+
+  const railHidden = !!selected && !railOpen;
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-page">
@@ -80,18 +107,64 @@ function SitesPage() {
           onSelect={setSelected}
           build={build}
           onStageChange={onStageChange}
+          onReady={onReady}
         />
       )}
+
+      {/* Navigation cluster — always reachable */}
+      <div className="absolute left-1/2 bottom-6 z-50 flex -translate-x-1/2 items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={goToGlobe}
+          disabled={stage === "globe" && !selected}
+          className="rounded-full border-hairline bg-background/70 px-4 text-[11px] uppercase tracking-[0.16em] backdrop-blur-md disabled:opacity-40"
+        >
+          ← Globe
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => step(-1)}
+          className="rounded-full border-hairline bg-background/70 px-3 text-[11px] uppercase tracking-[0.16em] backdrop-blur-md"
+        >
+          Prev
+        </Button>
+        <span className="num min-w-[150px] text-center text-[12px] opacity-80">
+          {current ? `${current.nom} · ${current.pays}` : "17 sites"}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => step(1)}
+          className="rounded-full border-hairline bg-background/70 px-3 text-[11px] uppercase tracking-[0.16em] backdrop-blur-md"
+        >
+          Next
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setRailOpen((v) => !v)}
+          className="rounded-full border-hairline bg-background/70 px-4 text-[11px] uppercase tracking-[0.16em] backdrop-blur-md"
+        >
+          {railHidden ? "All sites" : "Hide list"}
+        </Button>
+      </div>
 
       {/* Site index rail */}
       <motion.aside
         initial={{ opacity: 0, x: -16 }}
-        animate={{ opacity: selected ? 0 : 1, x: selected ? -16 : 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className={`absolute left-6 top-28 z-30 w-[260px] md:left-10 ${
-          selected ? "pointer-events-none" : ""
+        animate={{ opacity: railHidden ? 0 : 1, x: railHidden ? -16 : 0 }}
+        transition={{ duration: 0.4 }}
+        className={`absolute left-6 top-28 z-40 w-[260px] md:left-10 ${
+          railHidden ? "pointer-events-none" : ""
         }`}
       >
+
         <div className="label-xs">Candidate sites</div>
         <p className="mt-3 max-w-[240px] text-[12px] font-light leading-relaxed text-foreground/72">
           Hover a marker to descend one level — globe, country, city, site. At site level the
@@ -209,10 +282,12 @@ function SitesPage() {
             style={{ transitionTimingFunction: "cubic-bezier(0.22,1,0.36,1)" }}
           >
             <div className="flex items-baseline justify-between">
-              <div className="label-xs">Campus maquette</div>
-              <div className="label-xs text-primary opacity-100">
-                {(selected ?? stageSite)?.nom}
+              <div className="label-xs truncate">
+                {current ? siteArchetype(current) : "campus"} maquette
               </div>
+              <div className="label-xs shrink-0 pl-2 text-primary opacity-100">{current?.nom}</div>
+
+
             </div>
             <SiteMaquette3D
               site={(selected ?? stageSite) as Site}

@@ -35,6 +35,11 @@ const MODEL_LAYERS: {
   { id: "site-turbines", key: "turbines", height: 110, base: 0, color: "#e8edf5", opacity: 0.95 },
 ];
 
+export interface MapApi {
+  goToGlobe: () => void;
+  flyToSite: (site: Site) => void;
+}
+
 interface Props {
   sites: Site[];
   axes: GrilleAxes;
@@ -44,7 +49,9 @@ interface Props {
   onSelect: (site: Site) => void;
   build: BuildSpec;
   onStageChange?: (stage: ZoomStage, siteId: string | null) => void;
+  onReady?: (api: MapApi) => void;
 }
+
 
 export function WorldMap({
   sites,
@@ -55,7 +62,9 @@ export function WorldMap({
   onSelect,
   build,
   onStageChange,
+  onReady,
 }: Props) {
+
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Map<string, { marker: MLMarker; el: HTMLDivElement }>>(new Map());
@@ -175,13 +184,15 @@ export function WorldMap({
   /* ---------- camera ---------- */
 
   const goToLevel = useCallback(
-    (n: number, site: Site | null) => {
+    (n: number, site: Site | null, force = false) => {
       const m = mapRef.current;
-      if (!m || flying.current) return;
+      if (!m) return;
+      if (flying.current && !force) return;
       const lv = Math.max(0, Math.min(3, n));
       const target = LEVELS[lv];
       if (lv > 0 && !site) return;
       if (lv < 3) disableSite();
+
       flying.current = true;
       level.current = lv;
       focus.current = lv > 0 && site ? site.id : null;
@@ -386,7 +397,28 @@ export function WorldMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---------- imperative API for the page chrome ---------- */
+
+  useEffect(() => {
+    onReady?.({
+      goToGlobe: () => {
+        if (dwell.current) window.clearTimeout(dwell.current);
+        if (climb.current) window.clearTimeout(climb.current);
+        focus.current = null;
+        goToLevel(0, null, true);
+        onStageRef.current?.("globe", null);
+      },
+      flyToSite: (s: Site) => {
+        if (dwell.current) window.clearTimeout(dwell.current);
+        if (climb.current) window.clearTimeout(climb.current);
+        goToLevel(3, s, true);
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goToLevel]);
+
   /* ---------- hover styling ---------- */
+
 
   useEffect(() => {
     markers.current.forEach(({ el }, id) => {
