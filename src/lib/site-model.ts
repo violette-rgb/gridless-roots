@@ -9,7 +9,19 @@ export interface BuildSpec {
   batt_mwh: number;
 }
 
-type FC = GeoJSON.FeatureCollection<GeoJSON.Polygon, { kind: string }>;
+export interface Poly {
+  type: "Polygon";
+  coordinates: [number, number][][];
+}
+export interface Feat {
+  type: "Feature";
+  properties: { kind: string };
+  geometry: Poly;
+}
+export interface FC {
+  type: "FeatureCollection";
+  features: Feat[];
+}
 
 const M_PER_DEG_LAT = 111_320;
 
@@ -27,7 +39,7 @@ function rect(
   w: number,
   h: number,
   rot = 0,
-): GeoJSON.Polygon {
+): Poly {
   const c = Math.cos(rot);
   const s = Math.sin(rot);
   const pts: [number, number][] = [
@@ -40,7 +52,7 @@ function rect(
   return { type: "Polygon", coordinates: [pts] };
 }
 
-function ngon(lat: number, lng: number, cx: number, cy: number, r: number, n = 8): GeoJSON.Polygon {
+function ngon(lat: number, lng: number, cx: number, cy: number, r: number, n = 8): Poly {
   const pts: [number, number][] = [];
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
