@@ -209,7 +209,7 @@ export function WorldMap({
               id: "basemap",
               type: "raster",
               source: "basemap",
-              paint: { "raster-brightness-min": 0.12, "raster-saturation": -0.1, "raster-opacity": 1 },
+              paint: { "raster-brightness-min": 0.06, "raster-contrast": 0.15, "raster-saturation": -0.05, "raster-opacity": 1 },
             },
           ],
         },
