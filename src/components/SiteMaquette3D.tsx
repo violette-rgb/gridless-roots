@@ -158,8 +158,8 @@ function Campus({ site, build }: { site: Site; build: BuildSpec }) {
   /** flattest pad found by sampling the relief — different for every site */
   const pad = useMemo(() => {
     let best = { x: 0, z: 0, score: Infinity };
-    for (let x = -12; x <= 12; x += 1.5) {
-      for (let z = -12; z <= 12; z += 1.5) {
+    for (let x = -5; x <= 5; x += 1) {
+      for (let z = -5; z <= 5; z += 1) {
         const h = elev(x, z);
         const rough =
           Math.abs(elev(x + 1.5, z) - h) +
