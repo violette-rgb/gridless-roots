@@ -26,13 +26,13 @@ export const Route = createFileRoute("/sites")({
       {
         name: "description",
         content:
-          "Rotate the globe, hover a candidate site and watch the camera settle over its country. Eighteen European locations, one number: loss-of-load probability.",
+          "Rotate the globe, hover a candidate site and watch the camera settle over its country. Seventeen European locations, one number: loss-of-load probability.",
       },
       { property: "og:title", content: "Site explorer — Off-grid datacenter siting" },
       {
         property: "og:description",
         content:
-          "Interactive globe of eighteen candidate sites for grid-independent compute, with wind, solar, battery and LOLP for each.",
+          "Interactive globe of seventeen candidate sites for grid-independent compute, with wind, solar, battery and LOLP for each.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -171,7 +171,7 @@ function SitesPage() {
             })}
         </ul>
 
-        {!data && !isError && <p className="label-xs mt-6">Loading 18 sites…</p>}
+        {!data && !isError && <p className="label-xs mt-6">Loading 17 sites…</p>}
         {isError && <p className="label-xs mt-6">Dataset unavailable.</p>}
       </motion.aside>
 

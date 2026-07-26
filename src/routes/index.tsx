@@ -79,7 +79,7 @@ function Landing() {
             variants={fade}
             className="mt-8 max-w-lg text-[15px] font-light leading-relaxed text-foreground/75"
           >
-            A grid connection in Europe takes seven to ten years. We simulate eighteen
+            A grid connection in Europe takes seven to ten years. We simulate seventeen
             candidate sites hour by hour across a full meteorological year and answer one
             question: can wind, solar and storage alone hold the load?
 
@@ -116,7 +116,7 @@ function Landing() {
             variants={fade}
             className="mt-20 grid max-w-3xl grid-cols-2 gap-8 border-t border-hairline pt-8 md:grid-cols-4"
           >
-            <Stat k="18" label="candidate sites" />
+            <Stat k="17" label="candidate sites" />
             <Stat k="8 760" label="hourly points / site" />
             <Stat k="3" label="IT loads simulated" />
             <Stat k="1 %" label="viability threshold" />
@@ -152,7 +152,7 @@ function Landing() {
       {/* Sites preview */}
       <Section
         eyebrow="The sites"
-        title="Eighteen locations, ranked by the hardest test we run."
+        title="Seventeen locations, ranked by the hardest test we run."
       >
         <p className="-mt-8 mb-8 max-w-xl text-[13px] font-light leading-relaxed text-foreground/72">
           Each row shows two numbers. <span className="text-primary">LOLP · ref build</span> is
