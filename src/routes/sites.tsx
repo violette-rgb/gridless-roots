@@ -218,7 +218,15 @@ function SitesPage() {
                 {terrainFor(maquette.id, maquette.latitude).landform.replace("-", " ")}
               </div>
             </div>
-            <MiniMaquette site={maquette} />
+            <SiteConcept
+              siteId={maquette.id}
+              latitude={maquette.latitude}
+              turbines={REFERENCE_BUILD.turbines}
+              pv={REFERENCE_BUILD.pv_mw}
+              batt={REFERENCE_BUILD.batt_mwh}
+              pIt={50}
+              heightClass="h-[240px]"
+            />
             <p className="px-1 pt-2 text-[11px] font-light leading-relaxed text-foreground/70">
               6 km survey square on the site's own relief —{" "}
               {terrainFor(maquette.id, maquette.latitude).relief} m of it. Rotors take the
