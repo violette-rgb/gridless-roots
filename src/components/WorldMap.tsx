@@ -62,7 +62,9 @@ export function WorldMap({
   onSelect,
   build,
   onStageChange,
+  onReady,
 }: Props) {
+
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Map<string, { marker: MLMarker; el: HTMLDivElement }>>(new Map());
