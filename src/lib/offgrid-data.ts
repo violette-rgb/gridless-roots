@@ -142,10 +142,14 @@ export function formatCapex(capex: number | null) {
 }
 
 
+/** Sites outside the European study area are excluded from the tool. */
+const EXCLUDED_SITE_IDS = new Set(["ordos"]);
+
 export async function loadDataset(): Promise<Dataset> {
   const res = await fetch("/data.json");
   if (!res.ok) throw new Error("Unable to load dataset");
-  return (await res.json()) as Dataset;
+  const raw = (await res.json()) as Dataset;
+  return { ...raw, sites: raw.sites.filter((s) => !EXCLUDED_SITE_IDS.has(s.id)) };
 }
 
 /** Reference build used to compare sites on equal terms (not the max sizing). */
