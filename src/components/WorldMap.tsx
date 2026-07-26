@@ -321,6 +321,14 @@ export function WorldMap({
         }
       });
 
+      map.on("zoom", () => {
+        const mm = mapRef.current;
+        if (!mm) return;
+        const z = mm.getZoom();
+        if (z >= 8) enableTerrain();
+        else disableTerrain();
+      });
+
       map.on("mousedown", () => {
         spinTarget.current = 0;
         if (dwell.current) window.clearTimeout(dwell.current);
