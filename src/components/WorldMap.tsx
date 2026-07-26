@@ -64,6 +64,7 @@ export function WorldMap({
   const flying = useRef(false);
   const terrainOn = useRef(false);
   const siteOn = useRef(false);
+  const lastEx = useRef(0);
   const dwell = useRef<number | null>(null);
   const climb = useRef<number | null>(null);
   const spinTarget = useRef(3);
@@ -111,7 +112,10 @@ export function WorldMap({
     const z = m.getZoom();
     // 1.2 at z8 -> 1.6 at z13
     const ex = 1.2 + ((Math.max(8, Math.min(13, z)) - 8) / 5) * 0.4;
-    m.setTerrain({ source: DEM_SOURCE, exaggeration: ex });
+    if (!terrainOn.current || Math.abs(ex - lastEx.current) > 0.03) {
+      lastEx.current = ex;
+      m.setTerrain({ source: DEM_SOURCE, exaggeration: ex });
+    }
     terrainOn.current = true;
   }, []);
 
