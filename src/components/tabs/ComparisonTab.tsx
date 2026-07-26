@@ -78,8 +78,8 @@ export function ComparisonTab({
                   borderRadius: 12,
                   fontSize: 11,
                 }}
-                formatter={(v: number, k: string) =>
-                  k === "lolp" ? `${formatLolp(v)} %` : `${v}`
+                formatter={(v, k) =>
+                  k === "lolp" ? `${formatLolp(Number(v))} %` : `${v}`
                 }
                 labelFormatter={() => ""}
               />
