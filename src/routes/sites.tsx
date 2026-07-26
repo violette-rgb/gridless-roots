@@ -200,6 +200,7 @@ function SitesPage() {
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             onPointerEnter={() => setMaquetteOpen(true)}
             onPointerLeave={() => setMaquetteOpen(false)}
+            onClick={() => setMaquetteOpen(true)}
             className={
               maquetteOpen
                 ? "panel absolute left-1/2 top-1/2 z-40 h-[70vh] w-[70vw] -translate-x-1/2 -translate-y-1/2 px-6 pb-4 pt-4"
@@ -236,6 +237,13 @@ function SitesPage() {
       </div>
 
 
+      <div
+        className="transition-opacity duration-300"
+        style={{
+          opacity: maquetteOpen ? 0 : 1,
+          pointerEvents: maquetteOpen ? "none" : undefined,
+        }}
+      >
       <AnimatePresence>
         {selected && data && (
           <SiteDetail
@@ -251,6 +259,7 @@ function SitesPage() {
           />
         )}
       </AnimatePresence>
+      </div>
 
       <footer className="label-xs pointer-events-none absolute bottom-5 left-6 z-30 md:left-10">
         Open-Meteo / ERA5 — 2023 — 8760 hourly points per site
