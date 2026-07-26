@@ -152,81 +152,128 @@ function Turbine({ position }: { position: [number, number, number] }) {
 
 function Campus({ site, build }: { site: Site; build: BuildSpec }) {
   const elev = useMemo(() => elevationFn(site), [site]);
+  const kind = useMemo(() => siteArchetype(site), [site]);
+  const seed = useMemo(() => idHash(site.id), [site.id]);
+
+  /** flattest pad found by sampling the relief — different for every site */
+  const pad = useMemo(() => {
+    let best = { x: 0, z: 0, score: Infinity };
+    for (let x = -12; x <= 12; x += 1.5) {
+      for (let z = -12; z <= 12; z += 1.5) {
+        const h = elev(x, z);
+        const rough =
+          Math.abs(elev(x + 1.5, z) - h) +
+          Math.abs(elev(x - 1.5, z) - h) +
+          Math.abs(elev(x, z + 1.5) - h) +
+          Math.abs(elev(x, z - 1.5) - h);
+        const score = rough * 3 - h * 0.15;
+        if (score < best.score) best = { x, z, score };
+      }
+    }
+    return best;
+  }, [elev]);
+
+  /** campus bearing: along the valley for fjords, seeded elsewhere */
+  const bearing = useMemo(() => {
+    if (kind === "fjord") return 0;
+    return ((seed % 8) / 8) * Math.PI;
+  }, [kind, seed]);
+
+  const padY = useMemo(() => elev(pad.x, pad.z), [elev, pad]);
+
+  const hallCount = kind === "plain" ? 6 : kind === "fjord" ? 3 : 4;
+  const hallGap = kind === "plain" ? 2.7 : 3.1;
+  const hallLen = kind === "fjord" ? 5.6 : kind === "plain" ? 8.2 : 7.4;
 
   const halls = useMemo(
     () =>
-      Array.from({ length: 4 }, (_, i) => {
-        const x = (i - 1.5) * 3.1;
-        const z = 0;
-        return [x, elev(x, z), z] as [number, number, number];
-      }),
-    [elev],
+      Array.from({ length: hallCount }, (_, i) => (i - (hallCount - 1) / 2) * hallGap),
+    [hallCount, hallGap],
   );
 
   const batteries = useMemo(() => {
     const n = Math.max(2, Math.min(60, Math.round(build.batt_mwh / 25)));
+    const perRow = kind === "fjord" ? 6 : 10;
     return Array.from({ length: n }, (_, i) => {
-      const col = i % 10;
-      const row = Math.floor(i / 10);
-      const x = -5 + col * 1.1;
-      const z = 5.5 + row * 0.9;
-      return [x, elev(x, z), z] as [number, number, number];
+      const col = i % perRow;
+      const row = Math.floor(i / perRow);
+      return [-(perRow * 1.1) / 2 + col * 1.1, hallLen / 2 + 1.6 + row * 0.9] as [number, number];
     });
-  }, [build.batt_mwh, elev]);
+  }, [build.batt_mwh, kind, hallLen]);
 
   const solar = useMemo(() => {
     const rows = Math.max(1, Math.min(20, Math.round(build.pv_mw / 6)));
+    // terraced on plateaus, single field on plains, split banks on the coast
     return Array.from({ length: rows }, (_, i) => {
-      const z = -5 - i * 1.15;
-      const x = 1.5;
-      return [x, elev(x, z), z] as [number, number, number];
+      const bank = kind === "plateau" ? Math.floor(i / 4) : 0;
+      const z = -(hallLen / 2 + 2) - (i % (kind === "plateau" ? 4 : rows || 1)) * 1.15 - bank * 1.4;
+      const x = bank * 5.5 + ((seed % 3) - 1) * 1.2;
+      return [x, z] as [number, number];
     });
-  }, [build.pv_mw, elev]);
+  }, [build.pv_mw, kind, hallLen, seed]);
 
+  /** turbines seek the windiest high ground, never a perfect circle */
   const turbines = useMemo(() => {
     const n = Math.max(0, Math.min(48, build.turbines));
-    const out: [number, number, number][] = [];
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + (i % 3) * 0.11;
-      const r = 15 + (i % 4) * 3.2;
+    const candidates: { x: number; z: number; h: number }[] = [];
+    for (let i = 0; i < 900; i++) {
+      const a = hash(i, seed, 1) * Math.PI * 2;
+      const r = 11 + hash(i, seed, 2) * 17;
       const x = Math.cos(a) * r;
-      const z = Math.sin(a) * r * 0.9;
-      out.push([x, elev(x, z), z]);
+      const z = Math.sin(a) * r;
+      candidates.push({ x, z, h: elev(x, z) });
     }
-    return out;
-  }, [build.turbines, elev]);
+    candidates.sort((a, b) => b.h - a.h);
+    const picked: { x: number; z: number; h: number }[] = [];
+    const minGap = kind === "plain" ? 3.4 : 2.6;
+    for (const c of candidates) {
+      if (picked.length >= n) break;
+      if (picked.every((p) => Math.hypot(p.x - c.x, p.z - c.z) > minGap)) picked.push(c);
+    }
+    return picked.map((p) => [p.x, p.h, p.z] as [number, number, number]);
+  }, [build.turbines, elev, kind, seed]);
+
+  const tilt = kind === "plateau" ? -0.42 : -0.55;
 
   return (
     <group>
-      {halls.map((p, i) => (
-        <mesh key={`h${i}`} position={[p[0], p[1] + 0.45, p[2]]}>
-          <boxGeometry args={[2.1, 0.9, 7.4]} />
-          <meshStandardMaterial color="#c8cfe0" roughness={0.6} />
+      {/* graded pad + campus, rotated to the site's own bearing */}
+      <group position={[pad.x, padY, pad.z]} rotation={[0, bearing, 0]}>
+        <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[hallCount * hallGap + 3, hallLen + 3]} />
+          <meshStandardMaterial color="#141d26" roughness={1} />
         </mesh>
-      ))}
-      {batteries.map((p, i) => (
-        <mesh key={`b${i}`} position={[p[0], p[1] + 0.16, p[2]]}>
-          <boxGeometry args={[0.8, 0.32, 0.42]} />
-          <meshStandardMaterial color="#8fa3b8" roughness={0.7} />
-        </mesh>
-      ))}
-      {solar.map((p, i) => (
-        <mesh key={`s${i}`} position={[p[0], p[1] + 0.18, p[2]]} rotation={[-0.52, 0, 0]}>
-          <planeGeometry args={[10.5, 0.75]} />
-          <meshStandardMaterial
-            color="#1b3a5c"
-            side={THREE.DoubleSide}
-            roughness={0.35}
-            metalness={0.35}
-          />
-        </mesh>
-      ))}
+        {halls.map((x, i) => (
+          <mesh key={`h${i}`} position={[x, 0.5, 0]}>
+            <boxGeometry args={[2.1, 0.9, hallLen]} />
+            <meshStandardMaterial color="#c8cfe0" roughness={0.6} />
+          </mesh>
+        ))}
+        {batteries.map((p, i) => (
+          <mesh key={`b${i}`} position={[p[0], 0.2, p[1]]}>
+            <boxGeometry args={[0.8, 0.32, 0.42]} />
+            <meshStandardMaterial color="#8fa3b8" roughness={0.7} />
+          </mesh>
+        ))}
+        {solar.map((p, i) => (
+          <mesh key={`s${i}`} position={[p[0], 0.22, p[1]]} rotation={[tilt, 0, 0]}>
+            <planeGeometry args={[kind === "plateau" ? 5 : 10.5, 0.75]} />
+            <meshStandardMaterial
+              color="#1b3a5c"
+              side={THREE.DoubleSide}
+              roughness={0.35}
+              metalness={0.35}
+            />
+          </mesh>
+        ))}
+      </group>
       {turbines.map((p, i) => (
         <Turbine key={`t${i}`} position={p} />
       ))}
     </group>
   );
 }
+
 
 function Rig({ expanded }: { expanded: boolean }) {
   const target = expanded ? { r: 46, y: 26 } : { r: 34, y: 19 };
