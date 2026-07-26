@@ -106,7 +106,7 @@ export function ViabilityTab({
           <div className="mt-1 flex items-baseline">
             <span
               className="num font-extralight leading-[0.85] transition-colors duration-[400ms]"
-              style={{ fontSize: "clamp(80px, 11vw, 140px)", color, fontWeight: 200 }}
+              style={{ fontSize: "clamp(56px, 6.5vw, 96px)", color, fontWeight: 200 }}
             >
               {display}
             </span>

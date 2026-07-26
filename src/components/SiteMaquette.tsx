@@ -116,7 +116,7 @@ export function SiteMaquette({
   }, [site.id, build]);
 
   return (
-    <svg viewBox="-190 -150 380 260" className={className} role="img" aria-label={`Campus maquette for ${site.nom}`}>
+    <svg viewBox="-125 -100 250 175" className={className} role="img" aria-label={`Campus maquette for ${site.nom}`}>
       <defs>
         <linearGradient id="mq-plate" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#22303f" />
