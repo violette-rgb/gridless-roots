@@ -329,6 +329,7 @@ export function WorldMap({
       disposed = true;
       cancelAnimationFrame(raf);
       resizeObs?.disconnect();
+      if (dwell.current) window.clearTimeout(dwell.current);
       if (climb.current) window.clearTimeout(climb.current);
       markers.current.forEach(({ marker }) => marker.remove());
       markers.current.clear();
