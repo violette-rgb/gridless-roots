@@ -8,7 +8,7 @@ export const Route = createFileRoute("/guide")({
       {
         name: "description",
         content:
-          "A plain-language guide to the off-grid siting instrument: what LOLP, PUE, CAPEX and the sizing sliders mean, and how to compare the eighteen candidate sites.",
+          "A plain-language guide to the off-grid siting instrument: what LOLP, PUE, CAPEX and the sizing sliders mean, and how to compare the seventeen candidate sites.",
       },
       { property: "og:title", content: "How to read this tool — off-grid siting guide" },
       {

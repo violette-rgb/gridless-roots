@@ -5,12 +5,14 @@ import { useCallback, useState } from "react";
 import { terrainFor } from "@/lib/terrain";
 import { WorldMap, type ZoomStage } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
+import SiteConcept from "@/components/tabs/SiteConcept";
 import { Button } from "@/components/ui/button";
 import {
   siteVerdict,
   formatLolp,
   referenceLolp,
   loadDataset,
+  REFERENCE_BUILD,
   VERDICT_COLOR,
   type Site,
 } from "@/lib/offgrid-data";
@@ -24,13 +26,13 @@ export const Route = createFileRoute("/sites")({
       {
         name: "description",
         content:
-          "Rotate the globe, hover a candidate site and watch the camera settle over its country. Eighteen European locations, one number: loss-of-load probability.",
+          "Rotate the globe, hover a candidate site and watch the camera settle over its country. Seventeen European locations, one number: loss-of-load probability.",
       },
       { property: "og:title", content: "Site explorer — Off-grid datacenter siting" },
       {
         property: "og:description",
         content:
-          "Interactive globe of eighteen candidate sites for grid-independent compute, with wind, solar, battery and LOLP for each.",
+          "Interactive globe of seventeen candidate sites for grid-independent compute, with wind, solar, battery and LOLP for each.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -169,7 +171,7 @@ function SitesPage() {
             })}
         </ul>
 
-        {!data && !isError && <p className="label-xs mt-6">Loading 18 sites…</p>}
+        {!data && !isError && <p className="label-xs mt-6">Loading 17 sites…</p>}
         {isError && <p className="label-xs mt-6">Dataset unavailable.</p>}
       </motion.aside>
 
@@ -218,7 +220,15 @@ function SitesPage() {
                 {terrainFor(maquette.id, maquette.latitude).landform.replace("-", " ")}
               </div>
             </div>
-            <MiniMaquette site={maquette} />
+            <SiteConcept
+              siteId={maquette.id}
+              latitude={maquette.latitude}
+              turbines={REFERENCE_BUILD.turbines}
+              pv={REFERENCE_BUILD.pv_mw}
+              batt={REFERENCE_BUILD.batt_mwh}
+              pIt={50}
+              heightClass="h-[240px]"
+            />
             <p className="px-1 pt-2 text-[11px] font-light leading-relaxed text-foreground/70">
               6 km survey square on the site's own relief —{" "}
               {terrainFor(maquette.id, maquette.latitude).relief} m of it. Rotors take the
@@ -271,50 +281,3 @@ function ScaleStep({ label, active, done }: { label: string; active: boolean; do
   );
 }
 
-function MiniMaquette({ site }: { site: Site }) {
-  const terrain = terrainFor(site.id, site.latitude);
-  const rugged = terrain.ruggedness;
-  const turbines = rugged > 0.72 ? [-118, -72, -18, 46, 104] : [-128, -82, -34, 24, 82, 134];
-  const panels = rugged > 0.62 ? 14 : 24;
-  const contours = Array.from({ length: 11 }, (_, i) => {
-    const y = 26 + i * 17;
-    const bend = rugged * 22;
-    return `M-190 ${y} C-122 ${y - bend + i * 1.5} -70 ${y + bend * 0.4} 0 ${y - rugged * 14} C68 ${y - bend * 0.3} 128 ${y + bend} 190 ${y - rugged * 5}`;
-  });
-
-  return (
-    <div className="h-[240px] overflow-hidden rounded-xl border border-hairline bg-background/80">
-      <svg className="h-full w-full" viewBox="0 0 420 240" role="img" aria-label={`${site.nom} topographic site maquette`}>
-        <rect width="420" height="240" fill="var(--page)" />
-        <g transform="translate(210 18)">
-          <path d="M-188 182 L-148 42 L-18 10 L134 36 L190 182 Z" fill="var(--muted)" opacity="0.58" />
-          <path d="M-188 182 L-148 42 L-18 10 L134 36 L190 182 Z" fill="none" stroke="var(--primary)" strokeOpacity="0.24" />
-          {contours.map((d, i) => (
-            <path key={i} d={d} fill="none" stroke="var(--primary)" strokeOpacity={i % 3 === 0 ? 0.42 : 0.22} strokeWidth={i % 3 === 0 ? 1.2 : 0.8} />
-          ))}
-          <g transform="translate(-18 118) rotate(-4)">
-            <rect x="-48" y="-18" width="96" height="40" rx="3" fill="var(--foreground)" opacity="0.82" />
-            <rect x="-39" y="-10" width="34" height="12" fill="var(--page)" opacity="0.82" />
-            <rect x="4" y="-10" width="34" height="12" fill="var(--page)" opacity="0.82" />
-            <rect x="-39" y="8" width="77" height="7" fill="var(--primary)" opacity="0.35" />
-          </g>
-          <g transform="translate(-104 146) rotate(-11)">
-            {Array.from({ length: panels }, (_, i) => (
-              <rect key={i} x={(i % 8) * 14} y={Math.floor(i / 8) * 11} width="10" height="6" fill="var(--primary)" opacity="0.72" />
-            ))}
-          </g>
-          {turbines.map((x, i) => (
-            <g key={x} transform={`translate(${x} ${55 + Math.sin(i * 1.4) * 14})`} opacity="0.92">
-              <line y1="34" y2="0" stroke="var(--foreground)" strokeWidth="1.8" />
-              <circle r="5.5" fill="none" stroke="var(--foreground)" strokeWidth="1.6" />
-              <line x1="0" y1="0" x2="0" y2="-13" stroke="var(--foreground)" strokeWidth="1.3" />
-              <line x1="0" y1="0" x2="11" y2="6" stroke="var(--foreground)" strokeWidth="1.3" />
-              <line x1="0" y1="0" x2="-11" y2="6" stroke="var(--foreground)" strokeWidth="1.3" />
-            </g>
-          ))}
-          <rect x="-192" y="16" width="384" height="180" fill="none" stroke="var(--primary)" strokeDasharray="5 8" strokeOpacity="0.3" />
-        </g>
-      </svg>
-    </div>
-  );
-}

@@ -10,7 +10,7 @@ import {
   VERDICT_COLOR,
   type Site,
 } from "@/lib/offgrid-data";
-import { terrainFor } from "@/lib/terrain";
+import { terrainFor, heightAt, waterLevel, seedOf } from "@/lib/terrain";
 
 export type ZoomStage = "globe" | "country" | "city" | "site";
 
@@ -129,39 +129,47 @@ function useCountries() {
   return countries;
 }
 
-function useSmoothTransform(target: TransformState) {
+function easeInOut(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+/**
+ * Cinematic camera tween. Runs entirely off React state: every frame is written
+ * straight to the DOM, so the globe never re-renders mid-flight.
+ */
+function useCameraTween(target: TransformState, apply: (t: TransformState, reveal: number) => void) {
   const currentRef = useRef<TransformState>(target);
-  const [current, setCurrent] = useState<TransformState>(target);
+  const applyRef = useRef(apply);
+  applyRef.current = apply;
 
   useEffect(() => {
+    const from = currentRef.current;
+    const duration =
+      Math.abs(Math.log(target.scale / from.scale)) > 0.05 ? 1900 : 900;
+    const start = performance.now();
     let raf = 0;
-    let last = performance.now();
 
     const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      const previous = currentRef.current;
-      const k = 1 - Math.exp(-1.85 * dt);
+      const p = Math.min(1, (now - start) / duration);
+      const e = easeInOut(p);
+      // zoom interpolates geometrically so the descent feels linear in altitude
+      const scale = from.scale * Math.pow(target.scale / from.scale, e);
       const next = {
-        x: previous.x + (target.x - previous.x) * k,
-        y: previous.y + (target.y - previous.y) * k,
-        scale: previous.scale + (target.scale - previous.scale) * k,
+        x: from.x + (target.x - from.x) * e,
+        y: from.y + (target.y - from.y) * e,
+        scale,
       };
-      const settled =
-        Math.abs(next.x - target.x) < 0.2 &&
-        Math.abs(next.y - target.y) < 0.2 &&
-        Math.abs(next.scale - target.scale) < 0.002;
-      currentRef.current = settled ? target : next;
-      setCurrent(currentRef.current);
-      if (!settled) raf = requestAnimationFrame(tick);
+      currentRef.current = next;
+      const reveal = Math.max(0, Math.min(1, (scale - 1.5) / (SITE_SCALE - 2.0)));
+      applyRef.current(next, reveal);
+      if (p < 1) raf = requestAnimationFrame(tick);
     };
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [target.x, target.y, target.scale]);
-
-  return current;
 }
+
 
 function Graticule() {
   const paths = useMemo(() => {
@@ -209,134 +217,85 @@ function CountryLayer({ countries }: { countries: CountryCollection | null }) {
   );
 }
 
-function seedNum(id: string) {
-  let h = 0;
-  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) % 100000;
-  return h;
-}
 
-/** Zoomed-in topographic site map, drawn in globe coordinates around the site. */
-function SiteTerrainPlan({ site, reveal }: { site: Site; reveal: number }) {
+/** Pure topographic zoom of the selected zone — relief only, no schematic overlay. */
+function SiteTerrainPlan({ site }: { site: Site }) {
   const center = projectPoint(site.longitude, site.latitude, HOME_VIEW);
   const terrain = terrainFor(site.id, site.latitude);
-  const seed = seedNum(site.id);
-  const rug = terrain.ruggedness;
+  const seed = seedOf(site.id);
 
-  const contours = useMemo(() => {
-    const rows: { d: string; index: number }[] = [];
-    for (let i = 0; i < 16; i += 1) {
-      const y = -132 + i * 17;
-      const a = Math.sin(seed * 0.017 + i * 0.7) * 16 * (0.5 + rug);
-      const b = Math.cos(seed * 0.031 + i * 0.53) * 13 * (0.5 + rug);
-      const c = Math.sin(seed * 0.011 + i * 0.9) * 10 * (0.4 + rug);
-      rows.push({
-        index: i,
-        d: `M-150 ${(y + a * 0.4).toFixed(1)} C-96 ${(y - a).toFixed(1)} -44 ${(y + b).toFixed(1)} 6 ${(y - c).toFixed(1)} C58 ${(y + b * 0.6).toFixed(1)} 106 ${(y - a * 0.7).toFixed(1)} 150 ${(y + c * 0.5).toFixed(1)}`,
-      });
+  /** Rendered once into an offscreen canvas — one <image> node, no per-frame cost. */
+  const topo = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const N = 320;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = N;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const img = ctx.createImageData(N, N);
+    const wl = waterLevel(terrain);
+    const bands = 18;
+
+    const h = new Float32Array(N * N);
+    for (let y = 0; y < N; y += 1) {
+      for (let x = 0; x < N; x += 1) {
+        h[y * N + x] = heightAt((x / (N - 1)) * 2 - 1, (y / (N - 1)) * 2 - 1, terrain, seed);
+      }
     }
-    return rows;
-  }, [seed, rug]);
 
-  const turbines = useMemo(
-    () =>
-      Array.from({ length: rug > 0.7 ? 7 : 9 }, (_, i) => {
-        const t = i / (rug > 0.7 ? 6 : 8);
-        return {
-          x: -132 + t * 264,
-          y: -62 + Math.sin(seed * 0.013 + t * 3.1) * 20 * (0.4 + rug),
-        };
-      }),
-    [seed, rug],
-  );
+    for (let y = 0; y < N; y += 1) {
+      for (let x = 0; x < N; x += 1) {
+        const i = y * N + x;
+        const v = h[i];
+        const band = Math.floor(v * bands);
+        const right = x < N - 1 ? Math.floor(h[i + 1] * bands) : band;
+        const down = y < N - 1 ? Math.floor(h[i + N] * bands) : band;
+        const isContour = band !== right || band !== down;
+        const major = band % 4 === 0;
+        // hillshade from the local gradient, lit from the north-west
+        const gx = (x < N - 1 ? h[i + 1] : v) - (x > 0 ? h[i - 1] : v);
+        const gy = (y < N - 1 ? h[i + N] : v) - (y > 0 ? h[i - N] : v);
+        const shade = Math.max(0.35, Math.min(1.35, 1 - (gx + gy) * 6));
 
-  const panelRows = rug > 0.62 ? 3 : 5;
+        let r = (5 + v * 26) * shade;
+        let g = (11 + v * 44) * shade;
+        let b = (19 + v * 62) * shade;
+
+        if (wl !== null && v < wl) {
+          r = 4;
+          g = 14;
+          b = 28;
+        } else if (isContour) {
+          const k = major ? 1 : 0.4;
+          r += 26 * k;
+          g += 66 * k;
+          b += 82 * k;
+        }
+
+        const o = i * 4;
+        img.data[o] = Math.min(255, r);
+        img.data[o + 1] = Math.min(255, g);
+        img.data[o + 2] = Math.min(255, b);
+        img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas.toDataURL("image/png");
+  }, [terrain, seed]);
 
   return (
-    <motion.g
-      transform={`translate(${center.x} ${center.y})`}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: reveal }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2, ease: "linear" }}
-      pointerEvents="none"
-    >
-      {/* survey ground */}
-      <rect x="-152" y="-136" width="304" height="272" rx="3" fill="var(--muted)" opacity="0.5" />
-      {terrain.coastal && (
-        <path d="M-152 96 C-96 84 -42 112 10 100 C64 88 110 116 152 104 L152 136 L-152 136 Z" fill="var(--page)" opacity="0.9" />
-      )}
-      {contours.map(({ d, index }) => (
-        <path
-          key={index}
-          d={d}
-          fill="none"
-          stroke="var(--primary)"
-          strokeOpacity={index % 4 === 0 ? 0.5 : 0.22}
-          strokeWidth={index % 4 === 0 ? 0.9 : 0.5}
-        />
-      ))}
+    <g transform={`translate(${center.x} ${center.y})`} pointerEvents="none">
+      {topo && <image href={topo} x="-150" y="-150" width="300" height="300" preserveAspectRatio="none" />}
 
-      {/* access road */}
-      <path
-        d={`M-152 ${(40 + (seed % 17)).toFixed(0)} C-80 ${(20 + (seed % 11)).toFixed(0)} -30 60 8 44 C48 27 96 40 152 18`}
-        fill="none"
-        stroke="var(--foreground)"
-        strokeOpacity="0.4"
-        strokeWidth="1.6"
-        strokeDasharray="6 4"
-      />
-
-      {/* turbine array on the exposed ridge */}
-      {turbines.map((t, i) => (
-        <g key={i} transform={`translate(${t.x.toFixed(1)} ${t.y.toFixed(1)})`}>
-          <circle r="13" fill="none" stroke="var(--primary)" strokeOpacity="0.28" strokeWidth="0.5" />
-          <line y1="0" y2="-9" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.9" />
-          <line x1="0" y1="-9" x2="0" y2="-16" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
-          <line x1="0" y1="-9" x2="6.5" y2="-5" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
-          <line x1="0" y1="-9" x2="-6.5" y2="-5" stroke="var(--foreground)" strokeOpacity="0.85" strokeWidth="0.7" />
-        </g>
-      ))}
-
-      {/* PV field on the gentle south-facing slope */}
-      <g transform="translate(-134 46)">
-        {Array.from({ length: panelRows * 10 }, (_, i) => (
-          <rect
-            key={i}
-            x={(i % 10) * 9.4}
-            y={Math.floor(i / 10) * 7.4}
-            width="7"
-            height="4.2"
-            fill="var(--primary)"
-            opacity="0.6"
-          />
-        ))}
-      </g>
-
-      {/* data halls on the graded pad */}
-      <g transform="translate(56 62)">
-        <rect x="-42" y="-20" width="84" height="42" rx="1.5" fill="var(--foreground)" opacity="0.16" />
-        {[0, 1, 2].map((i) => (
-          <rect key={i} x={-36 + i * 25} y="-14" width="21" height="30" fill="var(--foreground)" opacity="0.78" />
-        ))}
-        <rect x="-36" y="20" width="72" height="3" fill="var(--primary)" opacity="0.5" />
-      </g>
-
-      {/* survey frame, scale bar, north arrow */}
-      <rect x="-152" y="-136" width="304" height="272" fill="none" stroke="var(--primary)" strokeOpacity="0.4" strokeWidth="0.8" strokeDasharray="4 5" />
-      <g transform="translate(-144 126)">
-        <line x1="0" y1="0" x2="48" y2="0" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
-        <line x1="0" y1="-3" x2="0" y2="3" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
-        <line x1="48" y1="-3" x2="48" y2="3" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="1" />
-        <text x="0" y="-5" fill="var(--foreground)" fillOpacity="0.65" fontSize="6" letterSpacing="0.6">1 km</text>
-      </g>
-      <g transform="translate(138 -122)">
-        <path d="M0 -10 L4 6 L0 2 L-4 6 Z" fill="var(--primary)" opacity="0.8" />
-        <text x="-2.6" y="16" fill="var(--foreground)" fillOpacity="0.6" fontSize="6.5">N</text>
-      </g>
-      <text x="-150" y="-142" fill="var(--foreground)" fillOpacity="0.55" fontSize="6.5" letterSpacing="1">
+      <rect x="-150" y="-150" width="300" height="300" fill="none" stroke="var(--primary)" strokeOpacity="0.35" strokeWidth="0.7" strokeDasharray="4 6" />
+      <text x="-150" y="-156" fill="var(--foreground)" fillOpacity="0.6" fontSize="6.5" letterSpacing="1">
         {site.nom.toUpperCase()} · 6 KM SURVEY · {terrain.landform.replace("-", " ").toUpperCase()} · {terrain.relief} M RELIEF
       </text>
-    </motion.g>
+      <g transform="translate(-146 142)">
+        <line x1="0" y1="0" x2="50" y2="0" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="0.9" />
+        <text x="0" y="-4" fill="var(--foreground)" fillOpacity="0.6" fontSize="6">1 km</text>
+      </g>
+    </g>
   );
 }
 
@@ -413,8 +372,27 @@ export function WorldMap(props: Props) {
   const scale = focus ? SITE_SCALE : 1;
   const mapX = focusPoint ? CX - focusPoint.x * scale : 0;
   const mapY = focusPoint ? CY - focusPoint.y * scale : 0;
-  const mapTransform = useSmoothTransform({ x: mapX, y: mapY, scale });
-  const reveal = Math.max(0, Math.min(1, (mapTransform.scale - 1.6) / (SITE_SCALE - 2.1)));
+
+  const cameraRef = useRef<SVGGElement | null>(null);
+  const planRef = useRef<SVGGElement | null>(null);
+  const markersRef = useRef<SVGGElement | null>(null);
+
+  const applyCamera = useCallback((t: TransformState, reveal: number) => {
+    if (cameraRef.current) {
+      cameraRef.current.setAttribute(
+        "transform",
+        `matrix(${t.scale} 0 0 ${t.scale} ${t.x} ${t.y})`,
+      );
+    }
+    if (planRef.current) planRef.current.setAttribute("opacity", reveal.toFixed(3));
+    if (markersRef.current) {
+      markersRef.current.setAttribute("opacity", (1 - reveal * 0.96).toFixed(3));
+      markersRef.current.style.pointerEvents = reveal > 0.6 ? "none" : "auto";
+    }
+  }, []);
+
+  useCameraTween({ x: mapX, y: mapY, scale }, applyCamera);
+
 
   useEffect(() => {
     if (!focus) {
@@ -426,10 +404,12 @@ export function WorldMap(props: Props) {
     onApproach?.(null);
     onZoomStageChange?.("country", focus.id);
     const timers = [
-      window.setTimeout(() => onZoomStageChange?.("city", focus.id), 950),
-      window.setTimeout(() => onZoomStageChange?.("site", focus.id), 1950),
-      window.setTimeout(() => onApproach?.(focus.id), 2850),
+      window.setTimeout(() => onZoomStageChange?.("city", focus.id), 700),
+      window.setTimeout(() => onZoomStageChange?.("site", focus.id), 1450),
+      // the 3D maquette only mounts once the camera has fully settled
+      window.setTimeout(() => onApproach?.(focus.id), 2050),
     ];
+
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [focus, onApproach, onZoomStageChange]);
 
@@ -463,15 +443,17 @@ export function WorldMap(props: Props) {
         </defs>
 
         <rect width="1000" height="1000" fill="var(--page)" />
-        <g transform={`matrix(${mapTransform.scale} 0 0 ${mapTransform.scale} ${mapTransform.x} ${mapTransform.y})`}>
+        <g ref={cameraRef} transform="matrix(1 0 0 1 0 0)">
           <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeOcean)" filter="url(#glow)" opacity="0.95" />
           <Graticule />
           <CountryLayer countries={countries} />
-          <AnimatePresence>{focus && reveal > 0.01 && <SiteTerrainPlan key={focus.id} site={focus} reveal={reveal} />}</AnimatePresence>
+          <g ref={planRef} opacity="0" pointerEvents="none">
+            {focus && <SiteTerrainPlan key={focus.id} site={focus} />}
+          </g>
           <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
           <circle cx={CX} cy={CY} r={HOME_R} fill="none" stroke="var(--primary)" strokeOpacity="0.2" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
 
-          <g opacity={1 - reveal * 0.96} pointerEvents={reveal > 0.6 ? "none" : "auto"}>
+          <g ref={markersRef} opacity="1">
             <MarkerLayer
               sites={sites}
               hoveredId={hoveredId}
@@ -482,6 +464,7 @@ export function WorldMap(props: Props) {
               panelOpen={panelOpen}
             />
           </g>
+
         </g>
       </svg>
 
