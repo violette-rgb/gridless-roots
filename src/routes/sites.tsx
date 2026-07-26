@@ -186,11 +186,43 @@ function SitesPage() {
         </div>
       </motion.div>
 
+      {/* Campus maquette — what the centre looks like at the current build */}
+      <AnimatePresence>
+        {(selected || stageSite) && (
+          <motion.div
+            key="maquette"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 14 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="panel pointer-events-none absolute bottom-24 left-6 z-30 w-[268px] px-4 pb-3 pt-3 md:left-10"
+          >
+            <div className="flex items-baseline justify-between">
+              <div className="label-xs">Campus maquette</div>
+              <div className="label-xs text-primary opacity-100">
+                {(selected ?? stageSite)?.nom}
+              </div>
+            </div>
+            <SiteMaquette
+              site={(selected ?? stageSite) as Site}
+              build={build}
+              className="mt-1 h-[150px] w-full"
+            />
+            <div className="label-xs flex justify-between opacity-70">
+              <span>{build.turbines} turbines</span>
+              <span>{build.pv_mw} MWp</span>
+              <span>{build.batt_mwh} MWh</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="pointer-events-none absolute bottom-16 left-6 z-30 flex gap-4 md:left-10">
         <Key color="var(--viable)" text="Viable ≤ 1 %" />
         <Key color="var(--marginal)" text="Marginal" />
         <Key color="var(--failure)" text="Not viable" />
       </div>
+
 
       <AnimatePresence>
         {selected && data && (
