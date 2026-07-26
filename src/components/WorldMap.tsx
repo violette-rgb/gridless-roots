@@ -139,7 +139,10 @@ function easeInOut(t: number) {
  * Cinematic camera tween. Runs entirely off React state: every frame is written
  * straight to the DOM, so the globe never re-renders mid-flight.
  */
-function useCameraTween(target: TransformState, apply: (t: TransformState, reveal: number) => void) {
+function useCameraTween(
+  target: TransformState,
+  apply: (t: TransformState, reveal: number, depth: number) => void,
+) {
   const currentRef = useRef<TransformState>(target);
   const applyRef = useRef(apply);
   applyRef.current = apply;
@@ -165,7 +168,7 @@ function useCameraTween(target: TransformState, apply: (t: TransformState, revea
       // only surface the survey in the last stretch of the descent
       const p2 = Math.log(Math.max(1, scale)) / Math.log(SITE_SCALE);
       const reveal = Math.max(0, Math.min(1, (p2 - 0.72) / 0.26));
-      applyRef.current(next, reveal);
+      applyRef.current(next, reveal, p2);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
 
@@ -415,8 +418,9 @@ export function WorldMap(props: Props) {
   const cameraRef = useRef<SVGGElement | null>(null);
   const planRef = useRef<SVGGElement | null>(null);
   const markersRef = useRef<SVGGElement | null>(null);
+  const shadeRef = useRef<SVGCircleElement | null>(null);
 
-  const applyCamera = useCallback((t: TransformState, reveal: number) => {
+  const applyCamera = useCallback((t: TransformState, reveal: number, depth: number) => {
     if (cameraRef.current) {
       cameraRef.current.setAttribute(
         "transform",
@@ -424,6 +428,8 @@ export function WorldMap(props: Props) {
       );
     }
     if (planRef.current) planRef.current.setAttribute("opacity", reveal.toFixed(3));
+    // the globe shading only reads at globe scale — lift it as the camera descends
+    if (shadeRef.current) shadeRef.current.setAttribute("opacity", Math.max(0, 1 - depth * 2.2).toFixed(3));
     if (markersRef.current) {
       markersRef.current.setAttribute("opacity", (1 - reveal * 0.96).toFixed(3));
       markersRef.current.style.pointerEvents = reveal > 0.6 ? "none" : "auto";
@@ -489,7 +495,7 @@ export function WorldMap(props: Props) {
           <g ref={planRef} opacity="0" pointerEvents="none">
             {focus && <SiteTerrainPlan key={focus.id} site={focus} />}
           </g>
-          <circle cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
+          <circle ref={shadeRef} cx={CX} cy={CY} r={HOME_R} fill="url(#globeShade)" pointerEvents="none" />
           <circle cx={CX} cy={CY} r={HOME_R} fill="none" stroke="var(--primary)" strokeOpacity="0.2" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
 
           <g ref={markersRef} opacity="1">
