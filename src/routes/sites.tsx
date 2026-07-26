@@ -2,11 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useState } from "react";
-import { terrainFor } from "@/lib/terrain";
 import { WorldMap, type ZoomStage } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
-import SiteConcept from "@/components/tabs/SiteConcept";
 import { Button } from "@/components/ui/button";
+import { useHydrated } from "@/lib/hooks";
+import type { BuildSpec } from "@/lib/site-model";
 import {
   siteVerdict,
   formatLolp,
@@ -17,8 +17,6 @@ import {
   type Site,
 } from "@/lib/offgrid-data";
 
-import { useHydrated } from "@/lib/hooks";
-
 export const Route = createFileRoute("/sites")({
   head: () => ({
     meta: [
@@ -26,13 +24,13 @@ export const Route = createFileRoute("/sites")({
       {
         name: "description",
         content:
-          "Rotate the globe, hover a candidate site and watch the camera settle over its country. Seventeen European locations, one number: loss-of-load probability.",
+          "One map, four levels. Descend from a rotating globe to real terrain and watch the off-grid campus build itself on the mountainside.",
       },
       { property: "og:title", content: "Site explorer — Off-grid datacenter siting" },
       {
         property: "og:description",
         content:
-          "Interactive globe of seventeen candidate sites for grid-independent compute, with wind, solar, battery and LOLP for each.",
+          "Interactive globe of seventeen candidate European sites for grid-independent compute, with wind, solar, battery and LOLP for each.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -40,6 +38,8 @@ export const Route = createFileRoute("/sites")({
   }),
   component: SitesPage,
 });
+
+const STAGES: ZoomStage[] = ["globe", "country", "city", "site"];
 
 function SitesPage() {
   const hydrated = useHydrated();
@@ -51,30 +51,24 @@ function SitesPage() {
   });
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<Site | null>(null);
-  const [approached, setApproached] = useState<string | null>(null);
-  const [zoomStage, setZoomStage] = useState<ZoomStage>("globe");
-  const [zoomSiteId, setZoomSiteId] = useState<string | null>(null);
-  const onApproach = useCallback((id: string | null) => setApproached(id), []);
-  const onZoomStageChange = useCallback((stage: ZoomStage, siteId: string | null) => {
-    setZoomStage(stage);
-    setZoomSiteId(siteId);
+  const [stage, setStage] = useState<ZoomStage>("globe");
+  const [stageSiteId, setStageSiteId] = useState<string | null>(null);
+  const [build, setBuild] = useState<BuildSpec>({
+    turbines: REFERENCE_BUILD.turbines,
+    pv_mw: REFERENCE_BUILD.pv_mw,
+    batt_mwh: REFERENCE_BUILD.batt_mwh,
+  });
+
+  const onStageChange = useCallback((s: ZoomStage, siteId: string | null) => {
+    setStage(s);
+    setStageSiteId(siteId);
   }, []);
-  const returnToGlobe = useCallback(() => {
-    setHovered(null);
-    setApproached(null);
-    setSelected(null);
-    setZoomStage("globe");
-    setZoomSiteId(null);
-  }, []);
-  const maquette =
-    !selected && approached && approached === hovered
-      ? (data?.sites.find((s) => s.id === approached) ?? null)
-      : null;
-  const zoomSite = zoomSiteId ? (data?.sites.find((s) => s.id === zoomSiteId) ?? null) : null;
+  const onBuild = useCallback((b: BuildSpec) => setBuild(b), []);
+  const stageSite = stageSiteId ? (data?.sites.find((s) => s.id === stageSiteId) ?? null) : null;
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-page">
-      {data && (
+      {data && hydrated && (
         <WorldMap
           sites={data.sites}
           axes={data.grille_axes}
@@ -82,10 +76,8 @@ function SitesPage() {
           hoveredId={hovered}
           onHover={setHovered}
           onSelect={setSelected}
-          panelOpen={!!selected}
-          onApproach={onApproach}
-          approachedId={maquette?.id ?? null}
-          onZoomStageChange={onZoomStageChange}
+          build={build}
+          onStageChange={onStageChange}
         />
       )}
 
@@ -94,23 +86,18 @@ function SitesPage() {
         initial={{ opacity: 0, x: -16 }}
         animate={{ opacity: selected ? 0 : 1, x: selected ? -16 : 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
-        className="absolute left-6 top-28 z-30 w-[260px] md:left-10"
+        className={`absolute left-6 top-28 z-30 w-[260px] md:left-10 ${
+          selected ? "pointer-events-none" : ""
+        }`}
       >
         <div className="label-xs">Candidate sites</div>
         <p className="mt-3 max-w-[240px] text-[12px] font-light leading-relaxed text-foreground/72">
-          Hover or tap a row to descend: globe, country, city, then site maquette. Click to open the instrument.
-          The figure is LOLP for a common reference build — 40 turbines, 100 MWp, 800 MWh — at 50 MW IT load, so sites are comparable.
+          Hover a marker to descend one level — globe, country, city, site. At site level the
+          map becomes real terrain and the campus is built on it. Click to open the instrument.
+          The figure is LOLP for a common reference build — 40 turbines, 100 MWp, 800 MWh — at
+          50 MW IT load.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={returnToGlobe}
-            className="rounded-full border-primary/40 bg-primary/10 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary hover:bg-primary/20"
-          >
-            Globe overview
-          </Button>
           <Button
             type="button"
             variant="outline"
@@ -132,7 +119,7 @@ function SitesPage() {
             .slice()
             .sort((a, b) => referenceLolp(data.grille_axes, a) - referenceLolp(data.grille_axes, b))
             .map((s) => {
-              const lolp = referenceLolp(data!.grille_axes, s);
+              const lolp = referenceLolp(data.grille_axes, s);
               const color = VERDICT_COLOR[siteVerdict(s)];
               const active = hovered === s.id;
               return (
@@ -140,15 +127,14 @@ function SitesPage() {
                   <Button
                     type="button"
                     variant="ghost"
-                      onMouseEnter={() => setHovered(s.id)}
-                      onPointerEnter={() => setHovered(s.id)}
+                    onPointerEnter={() => setHovered(s.id)}
                     onFocus={() => setHovered(s.id)}
                     onClick={() => {
                       setHovered(s.id);
                       setSelected(s);
                     }}
-                    className={`group flex h-auto w-full items-baseline justify-between rounded-none border-b border-hairline px-0 py-2.5 text-left font-normal hover:bg-transparent ${
-                      active ? "opacity-100" : "opacity-75 hover:opacity-95"
+                    className={`group flex h-auto w-full items-baseline justify-between rounded-none border-b border-hairline px-0 py-2.5 text-left font-normal transition-opacity duration-300 hover:bg-transparent ${
+                      active ? "opacity-100" : "opacity-70 hover:opacity-95"
                     }`}
                   >
                     <span className="flex items-baseline gap-2.5">
@@ -175,23 +161,28 @@ function SitesPage() {
         {isError && <p className="label-xs mt-6">Dataset unavailable.</p>}
       </motion.aside>
 
+      {/* Descent readout */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: selected ? 0 : 1, y: selected ? -10 : 0 }}
         transition={{ duration: 0.35 }}
-        className="panel absolute left-1/2 top-24 z-30 w-[min(560px,calc(100vw-340px))] -translate-x-1/2 px-4 py-3"
+        className="panel pointer-events-none absolute left-1/2 top-24 z-30 w-[min(520px,calc(100vw-340px))] -translate-x-1/2 px-4 py-3"
       >
         <div className="flex items-baseline justify-between gap-4">
           <div className="label-xs">
-            {zoomSite ? `${zoomSite.nom} · ${zoomSite.pays}` : "Globe overview"}
+            {stageSite ? `${stageSite.nom} · ${stageSite.pays}` : "Globe overview"}
           </div>
-          <div className="label-xs text-primary opacity-100">{zoomStage}</div>
+          <div className="label-xs text-primary opacity-100">{stage}</div>
         </div>
         <div className="mt-3 grid grid-cols-4 gap-2">
-          <ScaleStep label="Globe" active={zoomStage === "globe"} done={zoomStage !== "globe"} />
-          <ScaleStep label="Country" active={zoomStage === "country"} done={zoomStage === "city" || zoomStage === "site"} />
-          <ScaleStep label="City" active={zoomStage === "city"} done={zoomStage === "site"} />
-          <ScaleStep label="Site" active={zoomStage === "site"} done={false} />
+          {STAGES.map((s, i) => (
+            <ScaleStep
+              key={s}
+              label={s}
+              active={stage === s}
+              done={STAGES.indexOf(stage) > i}
+            />
+          ))}
         </div>
       </motion.div>
 
@@ -201,44 +192,6 @@ function SitesPage() {
         <Key color="var(--failure)" text="Not viable" />
       </div>
 
-      {/* Architectural maquette — appears once the camera has landed on the site */}
-      <AnimatePresence>
-        {maquette && (
-          <motion.div
-            key={maquette.id}
-            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.97 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="panel absolute bottom-24 right-6 z-40 w-[380px] overflow-hidden p-3 md:right-10 md:w-[440px]"
-          >
-            <div className="flex items-baseline justify-between px-1 pb-2">
-              <div className="label-xs">
-                {maquette.nom} · {maquette.pays} · site maquette
-              </div>
-              <div className="label-xs">
-                {terrainFor(maquette.id, maquette.latitude).landform.replace("-", " ")}
-              </div>
-            </div>
-            <SiteConcept
-              siteId={maquette.id}
-              latitude={maquette.latitude}
-              turbines={REFERENCE_BUILD.turbines}
-              pv={REFERENCE_BUILD.pv_mw}
-              batt={REFERENCE_BUILD.batt_mwh}
-              pIt={50}
-              heightClass="h-[240px]"
-            />
-            <p className="px-1 pt-2 text-[11px] font-light leading-relaxed text-foreground/70">
-              6 km survey square on the site's own relief —{" "}
-              {terrainFor(maquette.id, maquette.latitude).relief} m of it. Rotors take the
-              exposed ridges, panels the gentle south slopes, halls the graded pad. Click
-              the site to open the full instrument.
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <AnimatePresence>
         {selected && data && (
           <SiteDetail
@@ -246,6 +199,11 @@ function SitesPage() {
             site={selected}
             data={data}
             onClose={() => setSelected(null)}
+            onBuild={onBuild}
+            onPickSite={(s) => {
+              setHovered(s.id);
+              setSelected(s);
+            }}
           />
         )}
       </AnimatePresence>
@@ -280,4 +238,3 @@ function ScaleStep({ label, active, done }: { label: string; active: boolean; do
     </div>
   );
 }
-
