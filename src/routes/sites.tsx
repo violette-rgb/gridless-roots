@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useState } from "react";
 import { WorldMap, type ZoomStage } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
-import { SiteMaquette } from "@/components/SiteMaquette";
+import { SiteMaquette3D } from "@/components/SiteMaquette3D";
 import { Button } from "@/components/ui/button";
 import { useHydrated } from "@/lib/hooks";
 import type { BuildSpec } from "@/lib/site-model";
@@ -53,6 +53,7 @@ function SitesPage() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<Site | null>(null);
   const [stage, setStage] = useState<ZoomStage>("globe");
+  const [maquetteOpen, setMaquetteOpen] = useState(false);
   const [stageSiteId, setStageSiteId] = useState<string | null>(null);
   const [build, setBuild] = useState<BuildSpec>({
     turbines: REFERENCE_BUILD.turbines,
