@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { ViabilityTab } from "@/components/tabs/ViabilityTab";
 import { ProfileTab } from "@/components/tabs/ProfileTab";
