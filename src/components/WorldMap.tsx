@@ -219,7 +219,7 @@ function CountryLayer({ countries }: { countries: CountryCollection | null }) {
 
 
 /** Pure topographic zoom of the selected zone — relief only, no schematic overlay. */
-function SiteTerrainPlan({ site, reveal }: { site: Site; reveal: number }) {
+function SiteTerrainPlan({ site }: { site: Site }) {
   const center = projectPoint(site.longitude, site.latitude, HOME_VIEW);
   const terrain = terrainFor(site.id, site.latitude);
   const seed = seedOf(site.id);
