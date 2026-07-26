@@ -201,15 +201,32 @@ export function WorldMap({
       markers.current.forEach(({ el }, id) => {
         el.classList.toggle("is-flying", !!focus.current && id !== focus.current);
       });
-      // the destination panel only appears in the last 600 ms of the flight
-      window.setTimeout(() => onStageRef.current?.(target.stage, focus.current), 1400);
+
+      const from = m.getCenter();
+      const to = site && lv > 0 ? { lng: site.longitude, lat: site.latitude } : from;
+      const dist = Math.hypot(to.lng - from.lng, (to.lat - from.lat) * 1.6);
+      // long hops (site -> distant site) rise high, cross, then descend:
+      // no tile thrash at z13 across a continent, so nothing arrives half-loaded
+      const far = dist > 1.2 && m.getZoom() > 6.5;
+      const duration = far ? 3200 : 2000;
+
+      if (far) {
+        // travel with terrain off — DEM tiles only matter once we arrive
+        disableTerrain();
+      }
+
+      window.setTimeout(
+        () => onStageRef.current?.(target.stage, focus.current),
+        Math.max(600, duration - 600),
+      );
       m.flyTo({
-        center: site && lv > 0 ? [site.longitude, site.latitude] : m.getCenter(),
+        center: [to.lng, to.lat],
         zoom: target.zoom,
         pitch: target.pitch,
         bearing: 0,
-        duration: 2000,
-        curve: 1.4,
+        duration,
+        curve: far ? 1.9 : 1.4,
+        minZoom: far ? Math.min(4.6, target.zoom - 1) : undefined,
         essential: true,
       });
       const done = () => {
@@ -218,9 +235,10 @@ export function WorldMap({
         if (lv === 3 && site) enableSite(site);
       };
       m.once("moveend", done);
-      window.setTimeout(done, 2400);
+      window.setTimeout(done, duration + 400);
+
     },
-    [disableSite, enableSite],
+    [disableSite, disableTerrain, enableSite],
   );
 
   /* ---------- map bootstrap ---------- */
