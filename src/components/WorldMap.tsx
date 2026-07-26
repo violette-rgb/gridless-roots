@@ -224,76 +224,69 @@ function SiteTerrainPlan({ site }: { site: Site }) {
   const terrain = terrainFor(site.id, site.latitude);
   const seed = seedOf(site.id);
 
-  const { cells, contours } = useMemo(() => {
-    const N = 44;
-    const span = 300;
-    const step = span / N;
+  /** Rendered once into an offscreen canvas — one <image> node, no per-frame cost. */
+  const topo = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const N = 320;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = N;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const img = ctx.createImageData(N, N);
     const wl = waterLevel(terrain);
-    const h: number[] = [];
-    for (let iy = 0; iy < N; iy += 1) {
-      for (let ix = 0; ix < N; ix += 1) {
-        const u = ((ix + 0.5) / N) * 2 - 1;
-        const v = ((iy + 0.5) / N) * 2 - 1;
-        h.push(heightAt(u, v, terrain, seed));
+    const bands = 18;
+
+    const h = new Float32Array(N * N);
+    for (let y = 0; y < N; y += 1) {
+      for (let x = 0; x < N; x += 1) {
+        h[y * N + x] = heightAt((x / (N - 1)) * 2 - 1, (y / (N - 1)) * 2 - 1, terrain, seed);
       }
     }
-    const bands = 12;
-    const cellList = h.map((value, i) => {
-      const ix = i % N;
-      const iy = Math.floor(i / N);
-      const submerged = wl !== null && value < wl;
-      return {
-        x: -span / 2 + ix * step,
-        y: -span / 2 + iy * step,
-        fill: submerged
-          ? `rgb(8,${Math.round(26 + value * 40)},${Math.round(46 + value * 50)})`
-          : `rgb(${Math.round(16 + value * 52)},${Math.round(26 + value * 74)},${Math.round(36 + value * 92)})`,
-      };
-    });
-    // contour edges: mark cells where the elevation band changes
-    const edges: { x: number; y: number; w: number; hgt: number; major: boolean }[] = [];
-    for (let iy = 0; iy < N; iy += 1) {
-      for (let ix = 0; ix < N; ix += 1) {
-        const i = iy * N + ix;
-        const band = Math.floor(h[i] * bands);
-        const right = ix < N - 1 ? Math.floor(h[i + 1] * bands) : band;
-        const down = iy < N - 1 ? Math.floor(h[i + N] * bands) : band;
-        if (band === right && band === down) continue;
-        edges.push({
-          x: -span / 2 + ix * step,
-          y: -span / 2 + iy * step,
-          w: step,
-          hgt: step,
-          major: band % 3 === 0,
-        });
+
+    for (let y = 0; y < N; y += 1) {
+      for (let x = 0; x < N; x += 1) {
+        const i = y * N + x;
+        const v = h[i];
+        const band = Math.floor(v * bands);
+        const right = x < N - 1 ? Math.floor(h[i + 1] * bands) : band;
+        const down = y < N - 1 ? Math.floor(h[i + N] * bands) : band;
+        const isContour = band !== right || band !== down;
+        const major = band % 4 === 0;
+        // hillshade from the local gradient, lit from the north-west
+        const gx = (x < N - 1 ? h[i + 1] : v) - (x > 0 ? h[i - 1] : v);
+        const gy = (y < N - 1 ? h[i + N] : v) - (y > 0 ? h[i - N] : v);
+        const shade = Math.max(0.35, Math.min(1.35, 1 - (gx + gy) * 6));
+
+        let r = (12 + v * 58) * shade;
+        let g = (22 + v * 92) * shade;
+        let b = (34 + v * 116) * shade;
+
+        if (wl !== null && v < wl) {
+          r = 6;
+          g = 22;
+          b = 42;
+        } else if (isContour) {
+          const k = major ? 1 : 0.4;
+          r += 40 * k;
+          g += 96 * k;
+          b += 116 * k;
+        }
+
+        const o = i * 4;
+        img.data[o] = Math.min(255, r);
+        img.data[o + 1] = Math.min(255, g);
+        img.data[o + 2] = Math.min(255, b);
+        img.data[o + 3] = 255;
       }
     }
-    return { cells: cellList, contours: edges };
+    ctx.putImageData(img, 0, 0);
+    return canvas.toDataURL("image/png");
   }, [terrain, seed]);
 
   return (
-    <g
-      transform={`translate(${center.x} ${center.y})`}
-      pointerEvents="none"
-      shapeRendering="crispEdges"
-    >
+    <g transform={`translate(${center.x} ${center.y})`} pointerEvents="none">
+      {topo && <image href={topo} x="-150" y="-150" width="300" height="300" preserveAspectRatio="none" />}
 
-      {cells.map((c, i) => (
-        <rect key={i} x={c.x} y={c.y} width={7} height={7} fill={c.fill} />
-      ))}
-      <g shapeRendering="auto">
-        {contours.map((c, i) => (
-          <rect
-            key={`c${i}`}
-            x={c.x}
-            y={c.y}
-            width={c.w}
-            height={c.hgt}
-            fill="var(--primary)"
-            opacity={c.major ? 0.3 : 0.13}
-          />
-        ))}
-      </g>
       <rect x="-150" y="-150" width="300" height="300" fill="none" stroke="var(--primary)" strokeOpacity="0.35" strokeWidth="0.7" strokeDasharray="4 6" />
       <text x="-150" y="-156" fill="var(--foreground)" fillOpacity="0.6" fontSize="6.5" letterSpacing="1">
         {site.nom.toUpperCase()} · 6 KM SURVEY · {terrain.landform.replace("-", " ").toUpperCase()} · {terrain.relief} M RELIEF
