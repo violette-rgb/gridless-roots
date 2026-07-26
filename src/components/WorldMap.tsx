@@ -54,7 +54,9 @@ const CX = 520;
 const CY = 500;
 const HOME_R = 286;
 const HOME_VIEW: ViewState = { lon: HOME[0], lat: HOME[1], progress: 0 };
-const SITE_SCALE = 3.1;
+const SITE_SCALE = 42;
+/** Half-width of the survey square in globe units; ~12 units wide once on screen. */
+const PLAN_HALF = 6;
 
 function projectPoint(lon: number, lat: number, view: ViewState): ProjectedPoint {
   const radius = HOME_R;
@@ -160,7 +162,9 @@ function useCameraTween(target: TransformState, apply: (t: TransformState, revea
         scale,
       };
       currentRef.current = next;
-      const reveal = Math.max(0, Math.min(1, (scale - 1.5) / (SITE_SCALE - 2.0)));
+      // only surface the survey in the last stretch of the descent
+      const p2 = Math.log(Math.max(1, scale)) / Math.log(SITE_SCALE);
+      const reveal = Math.max(0, Math.min(1, (p2 - 0.72) / 0.26));
       applyRef.current(next, reveal);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
@@ -284,7 +288,10 @@ function SiteTerrainPlan({ site }: { site: Site }) {
   }, [terrain, seed]);
 
   return (
-    <g transform={`translate(${center.x} ${center.y})`} pointerEvents="none">
+    <g
+      transform={`translate(${center.x} ${center.y}) scale(${PLAN_HALF / 150})`}
+      pointerEvents="none"
+    >
       {topo && <image href={topo} x="-150" y="-150" width="300" height="300" preserveAspectRatio="none" />}
 
       <rect x="-150" y="-150" width="300" height="300" fill="none" stroke="var(--primary)" strokeOpacity="0.35" strokeWidth="0.7" strokeDasharray="4 6" />
