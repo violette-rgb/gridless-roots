@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useState } from "react";
 import { WorldMap, type ZoomStage } from "@/components/WorldMap";
 import { SiteDetail } from "@/components/SiteDetail";
-import { SiteMaquette } from "@/components/SiteMaquette";
+import { SiteMaquette3D } from "@/components/SiteMaquette3D";
 import { Button } from "@/components/ui/button";
 import { useHydrated } from "@/lib/hooks";
 import type { BuildSpec } from "@/lib/site-model";
@@ -53,6 +53,7 @@ function SitesPage() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<Site | null>(null);
   const [stage, setStage] = useState<ZoomStage>("globe");
+  const [maquetteOpen, setMaquetteOpen] = useState(false);
   const [stageSiteId, setStageSiteId] = useState<string | null>(null);
   const [build, setBuild] = useState<BuildSpec>({
     turbines: REFERENCE_BUILD.turbines,
@@ -187,16 +188,24 @@ function SitesPage() {
         </div>
       </motion.div>
 
-      {/* Campus maquette — what the centre looks like at the current build */}
+      {/* Campus maquette — live 3D, expands on hover */}
       <AnimatePresence>
         {(selected || stageSite) && (
           <motion.div
             key="maquette"
+            layout
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 14 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="panel pointer-events-none absolute bottom-24 left-6 z-30 w-[268px] px-4 pb-3 pt-3 md:left-10"
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            onPointerEnter={() => setMaquetteOpen(true)}
+            onPointerLeave={() => setMaquetteOpen(false)}
+            className={
+              maquetteOpen
+                ? "panel absolute left-1/2 top-1/2 z-40 h-[70vh] w-[70vw] -translate-x-1/2 -translate-y-1/2 px-6 pb-4 pt-4"
+                : "panel absolute bottom-24 left-6 z-40 w-[300px] px-4 pb-3 pt-3 md:left-10"
+            }
+            style={{ transitionTimingFunction: "cubic-bezier(0.22,1,0.36,1)" }}
           >
             <div className="flex items-baseline justify-between">
               <div className="label-xs">Campus maquette</div>
@@ -204,10 +213,11 @@ function SitesPage() {
                 {(selected ?? stageSite)?.nom}
               </div>
             </div>
-            <SiteMaquette
+            <SiteMaquette3D
               site={(selected ?? stageSite) as Site}
               build={build}
-              className="mt-1 h-[150px] w-full"
+              expanded={maquetteOpen}
+              className={maquetteOpen ? "mt-1 h-[calc(70vh-84px)] w-full" : "mt-1 h-[172px] w-full"}
             />
             <div className="label-xs flex justify-between opacity-70">
               <span>{build.turbines} turbines</span>
@@ -216,6 +226,7 @@ function SitesPage() {
             </div>
           </motion.div>
         )}
+
       </AnimatePresence>
 
       <div className="pointer-events-none absolute bottom-16 left-6 z-30 flex gap-4 md:left-10">

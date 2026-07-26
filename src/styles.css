@@ -166,8 +166,17 @@
   opacity: 0.28;
 }
 .site-marker.is-active {
-  transform: scale(1.25);
+  transform: scale(1.35);
   z-index: 5;
+}
+.site-marker.is-press {
+  transform: scale(0.9);
+  transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.site-marker.is-flying {
+  opacity: 0.04;
+  transition: opacity 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
 }
 
 .site-marker__dot {
@@ -181,10 +190,14 @@
 }
 .site-marker.is-active .site-marker__dot {
   box-shadow:
-    0 0 18px var(--mk),
-    0 0 40px var(--mk);
+    0 0 22px var(--mk),
+    0 0 52px var(--mk);
 }
 
+.site-marker__ring,
+.site-marker__dot {
+  pointer-events: none;
+}
 .site-marker__ring {
   position: absolute;
   width: 26px;
