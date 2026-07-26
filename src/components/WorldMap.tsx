@@ -238,7 +238,7 @@ export function WorldMap({
       window.setTimeout(done, duration + 400);
 
     },
-    [disableSite, enableSite],
+    [disableSite, disableTerrain, enableSite],
   );
 
   /* ---------- map bootstrap ---------- */
