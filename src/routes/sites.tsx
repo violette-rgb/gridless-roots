@@ -278,8 +278,8 @@ function SitesPage() {
             onClick={() => setMaquetteOpen(true)}
             className={
               maquetteOpen
-                ? "panel absolute left-1/2 top-1/2 z-40 h-[70vh] w-[70vw] -translate-x-1/2 -translate-y-1/2 px-6 pb-4 pt-4"
-                : "panel absolute bottom-24 left-6 z-40 w-[300px] px-4 pb-3 pt-3 md:left-10"
+                ? "panel absolute left-1/2 top-1/2 z-50 h-[70vh] w-[70vw] -translate-x-1/2 -translate-y-1/2 px-6 pb-4 pt-4"
+                : "panel absolute right-4 top-24 z-50 w-[320px] px-4 pb-3 pt-3 md:right-10"
             }
             style={{ transitionTimingFunction: "cubic-bezier(0.22,1,0.36,1)" }}
           >
@@ -307,7 +307,10 @@ function SitesPage() {
 
       </AnimatePresence>
 
-      <div className="pointer-events-none absolute bottom-16 left-6 z-30 flex gap-4 md:left-10">
+      <div
+        className="pointer-events-none absolute bottom-16 left-6 z-30 flex gap-4 transition-opacity duration-300 md:left-10"
+        style={{ opacity: selected ? 0 : 1 }}
+      >
         <Key color="var(--viable)" text="Viable ≤ 1 %" />
         <Key color="var(--marginal)" text="Marginal" />
         <Key color="var(--failure)" text="Not viable" />
@@ -338,7 +341,10 @@ function SitesPage() {
       </AnimatePresence>
       </div>
 
-      <footer className="label-xs pointer-events-none absolute bottom-5 left-6 z-30 md:left-10">
+      <footer
+        className="label-xs pointer-events-none absolute bottom-5 left-6 z-30 transition-opacity duration-300 md:left-10"
+        style={{ opacity: selected ? 0 : 1 }}
+      >
         Open-Meteo / ERA5 — 2023 — 8760 hourly points per site
       </footer>
     </main>

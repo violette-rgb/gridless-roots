@@ -68,7 +68,7 @@ export function SiteDetail({
       className={`panel pointer-events-auto z-40 flex flex-col overflow-hidden ${
         embedded
           ? "relative h-[calc(100vh-8rem)] w-full"
-          : "absolute right-4 top-24 bottom-6 w-[min(38vw,470px)] max-lg:left-4 max-lg:w-auto"
+          : "absolute inset-x-4 bottom-16 h-[46vh] max-h-[440px] md:inset-x-10"
       }`}
     >
       <header className="flex items-start justify-between border-b border-hairline px-6 py-5">

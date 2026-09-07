@@ -58,37 +58,49 @@ export function ViabilityTab({
 
   return (
     <div className="space-y-8">
-      <div>
-        <span className="label-xs">IT load</span>
-        <div className="mt-3 flex gap-2">
-          {axes.p_it_mw.map((v) => (
-            <button
-              key={v}
-              onClick={() => onPIt(v)}
-              className={`num rounded-full border px-4 py-1.5 text-sm font-light transition-all duration-200 ${
-                v === pIt
-                  ? "border-primary/60 bg-primary/10 text-primary"
-                  : "border-hairline text-foreground/70 hover:text-foreground/80"
-              }`}
-            >
-              {v} MW
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-7">
-        <div className="flex flex-col">
-          <span className="label-xs">Loss of load probability</span>
-          <div className="mt-1 flex items-baseline">
-            <span
-              className="num font-extralight leading-[0.85] transition-colors duration-[400ms]"
-              style={{ fontSize: "clamp(52px, 5.4vw, 84px)", color, fontWeight: 200 }}
-            >
-              {display}
-            </span>
-            <span className="ml-2 text-2xl font-extralight opacity-60">%</span>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-12">
+        <div className="space-y-7">
+          <div>
+            <span className="label-xs">IT load</span>
+            <div className="mt-3 flex gap-2">
+              {axes.p_it_mw.map((v) => (
+                <button
+                  key={v}
+                  onClick={() => onPIt(v)}
+                  className={`num rounded-full border px-4 py-1.5 text-sm font-light transition-all duration-200 ${
+                    v === pIt
+                      ? "border-primary/60 bg-primary/10 text-primary"
+                      : "border-hairline text-foreground/70 hover:text-foreground/80"
+                  }`}
+                >
+                  {v} MW
+                </button>
+              ))}
+            </div>
           </div>
+
+          <div className="flex flex-col">
+            <span className="label-xs">Loss of load probability</span>
+            <div className="mt-1 flex items-baseline">
+              <span
+                className="num font-extralight leading-[0.85] transition-colors duration-[400ms]"
+                style={{ fontSize: "clamp(48px, 4.6vw, 76px)", color, fontWeight: 200 }}
+              >
+                {display}
+              </span>
+              <span className="ml-2 text-2xl font-extralight opacity-60">%</span>
+            </div>
+          </div>
+
+          <motion.p
+            key={verdictSentence(lolp)}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="max-w-xl text-[15px] font-light leading-relaxed text-foreground/70"
+          >
+            {verdictSentence(lolp)}
+          </motion.p>
         </div>
 
         <div className="space-y-7">
@@ -115,17 +127,6 @@ export function ViabilityTab({
         </div>
       </div>
 
-
-      <motion.p
-        key={verdictSentence(lolp)}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="max-w-xl text-base font-light leading-relaxed text-foreground/70"
-      >
-        {verdictSentence(lolp)}
-      </motion.p>
-
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline sm:grid-cols-4">
         <Stat label="Deficit hours / yr" value={deficit.toLocaleString("en-US")} />
         <Stat label="Autonomy" value={`${((1 - lolp) * 100).toFixed(2)} %`} />
@@ -135,6 +136,7 @@ export function ViabilityTab({
           value={`${formatLolp(scenario.meilleur_lolp_atteignable)} %`}
         />
       </div>
+
 
       {optimum && (
         <button
