@@ -344,12 +344,12 @@ function SitesPage() {
         }}
       >
       <AnimatePresence>
-        {selected && data && (
+        {selected && data && toolOpen && (
           <SiteDetail
             key={selected.id}
             site={selected}
             data={data}
-            onClose={() => setSelected(null)}
+            onClose={() => setToolOpen(false)}
             onBuild={onBuild}
             onPickSite={(s) => {
               setHovered(s.id);
