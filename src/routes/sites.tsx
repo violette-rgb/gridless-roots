@@ -263,48 +263,67 @@ function SitesPage() {
         </div>
       </motion.div>
 
-      {/* Campus maquette — live 3D, expands on hover */}
+      {/* Campus maquette — live 3D, click to enlarge */}
       <AnimatePresence>
+        {maquetteOpen && (
+          <motion.div
+            key="maquette-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={() => setMaquetteOpen(false)}
+            className="absolute inset-0 z-40 bg-background/70 backdrop-blur-sm"
+          />
+        )}
         {(selected || stageSite) && (
           <motion.div
             key="maquette"
-            layout
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 14 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            onPointerEnter={() => setMaquetteOpen(true)}
-            onPointerLeave={() => setMaquetteOpen(false)}
-            onClick={() => setMaquetteOpen(true)}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className={
               maquetteOpen
-                ? "panel absolute left-1/2 top-1/2 z-50 h-[70vh] w-[70vw] -translate-x-1/2 -translate-y-1/2 px-6 pb-4 pt-4"
-                : "panel absolute right-4 top-24 z-50 w-[320px] px-4 pb-3 pt-3 md:right-10"
+                ? "panel absolute left-1/2 top-1/2 z-50 flex h-[78vh] w-[min(1100px,88vw)] -translate-x-1/2 -translate-y-1/2 flex-col px-6 pb-4 pt-4"
+                : "panel absolute right-4 top-24 z-40 flex w-[320px] cursor-zoom-in flex-col px-4 pb-3 pt-3 md:right-10"
             }
-            style={{ transitionTimingFunction: "cubic-bezier(0.22,1,0.36,1)" }}
+            onClick={() => !maquetteOpen && setMaquetteOpen(true)}
           >
-            <div className="flex items-baseline justify-between">
+            <div className="flex items-baseline justify-between gap-3">
               <div className="label-xs truncate">
                 {current ? siteArchetype(current) : "campus"} maquette
               </div>
-              <div className="label-xs shrink-0 pl-2 text-primary opacity-100">{current?.nom}</div>
-
-
+              <div className="flex shrink-0 items-baseline gap-3">
+                <div className="label-xs text-primary opacity-100">{current?.nom}</div>
+                {maquetteOpen ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMaquetteOpen(false);
+                    }}
+                    className="label-xs rounded-full border border-hairline px-3 py-1 transition-colors hover:border-primary/40"
+                  >
+                    Close
+                  </button>
+                ) : (
+                  <span className="label-xs opacity-55">Click to enlarge</span>
+                )}
+              </div>
             </div>
             <SiteMaquette3D
               site={(selected ?? stageSite) as Site}
               build={build}
               expanded={maquetteOpen}
-              className={maquetteOpen ? "mt-1 h-[calc(70vh-84px)] w-full" : "mt-1 h-[172px] w-full"}
+              className={maquetteOpen ? "mt-2 min-h-0 flex-1 w-full" : "mt-1 h-[172px] w-full"}
             />
-            <div className="label-xs flex justify-between opacity-70">
+            <div className="label-xs mt-1 flex shrink-0 justify-between opacity-70">
               <span>{build.turbines} turbines</span>
               <span>{build.pv_mw} MWp</span>
               <span>{build.batt_mwh} MWh</span>
             </div>
           </motion.div>
         )}
-
       </AnimatePresence>
 
       <div
