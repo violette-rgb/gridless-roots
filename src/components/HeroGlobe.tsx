@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import type { Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+import { osmDarkStyle } from "@/lib/basemap";
 
 const MARKERS: { lon: number; lat: number }[] = [
   { lon: -5.98, lat: 37.39 },
@@ -29,7 +29,7 @@ export function HeroGlobe() {
       if (cancelled || !container.current) return;
       map = new maplibregl.Map({
         container: container.current,
-        style: STYLE_URL,
+        style: osmDarkStyle(),
         center: [10, 35],
         zoom: 1.35,
         interactive: false,
