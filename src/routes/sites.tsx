@@ -56,6 +56,7 @@ function SitesPage() {
   const [maquetteOpen, setMaquetteOpen] = useState(false);
   const [stageSiteId, setStageSiteId] = useState<string | null>(null);
   const [railOpen, setRailOpen] = useState(false);
+  const [toolOpen, setToolOpen] = useState(true);
   const [api, setApi] = useState<MapApi | null>(null);
   const [build, setBuild] = useState<BuildSpec>({
     turbines: REFERENCE_BUILD.turbines,
@@ -90,7 +91,10 @@ function SitesPage() {
       setMaquetteOpen(false);
       api?.flyToSite(next);
       // the instrument only reappears as the camera settles on the new site
-      window.setTimeout(() => setSelected(next), 2400);
+      window.setTimeout(() => {
+        setSelected(next);
+        setToolOpen(true);
+      }, 2400);
     },
     [api, current, ordered],
   );
@@ -106,7 +110,10 @@ function SitesPage() {
           selectedId={selected?.id ?? null}
           hoveredId={hovered}
           onHover={setHovered}
-          onSelect={setSelected}
+          onSelect={(s) => {
+            setSelected(s);
+            setToolOpen(true);
+          }}
           build={build}
           onStageChange={onStageChange}
           onReady={onReady}
@@ -155,6 +162,18 @@ function SitesPage() {
         >
           {railHidden ? "All sites" : "Hide list"}
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setToolOpen((v) => !v);
+            if (!selected && ordered.length) setSelected(current ?? ordered[0]);
+          }}
+          className="rounded-full border-primary/40 bg-background/70 px-4 text-[11px] uppercase tracking-[0.16em] text-primary backdrop-blur-md hover:bg-primary/10"
+        >
+          {selected && toolOpen ? "Hide tool" : "Open tool"}
+        </Button>
       </div>
 
       {/* Site index rail */}
@@ -179,7 +198,10 @@ function SitesPage() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => data?.sites[0] && setSelected(data.sites[0])}
+            onClick={() => {
+              if (data?.sites[0]) setSelected(data.sites[0]);
+              setToolOpen(true);
+            }}
             className="rounded-full border-primary/40 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary hover:bg-primary/10"
           >
             Open instrument
@@ -209,6 +231,7 @@ function SitesPage() {
                     onClick={() => {
                       setHovered(s.id);
                       setSelected(s);
+                      setToolOpen(true);
                     }}
                     className={`group flex h-auto w-full items-baseline justify-between rounded-none border-b border-hairline px-0 py-2.5 text-left font-normal transition-opacity duration-300 hover:bg-transparent ${
                       active ? "opacity-100" : "opacity-70 hover:opacity-95"
@@ -263,48 +286,67 @@ function SitesPage() {
         </div>
       </motion.div>
 
-      {/* Campus maquette — live 3D, expands on hover */}
+      {/* Campus maquette — live 3D, click to enlarge */}
       <AnimatePresence>
+        {maquetteOpen && (
+          <motion.div
+            key="maquette-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={() => setMaquetteOpen(false)}
+            className="absolute inset-0 z-40 bg-background/70 backdrop-blur-sm"
+          />
+        )}
         {(selected || stageSite) && (
           <motion.div
             key="maquette"
-            layout
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 14 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            onPointerEnter={() => setMaquetteOpen(true)}
-            onPointerLeave={() => setMaquetteOpen(false)}
-            onClick={() => setMaquetteOpen(true)}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className={
               maquetteOpen
-                ? "panel absolute left-1/2 top-1/2 z-50 h-[70vh] w-[70vw] -translate-x-1/2 -translate-y-1/2 px-6 pb-4 pt-4"
-                : "panel absolute right-4 top-24 z-50 w-[320px] px-4 pb-3 pt-3 md:right-10"
+                ? "panel absolute left-1/2 top-1/2 z-50 flex h-[78vh] w-[min(1100px,88vw)] -translate-x-1/2 -translate-y-1/2 flex-col px-6 pb-4 pt-4"
+                : "panel absolute right-4 top-24 z-40 flex w-[320px] cursor-zoom-in flex-col px-4 pb-3 pt-3 md:right-10"
             }
-            style={{ transitionTimingFunction: "cubic-bezier(0.22,1,0.36,1)" }}
+            onClick={() => !maquetteOpen && setMaquetteOpen(true)}
           >
-            <div className="flex items-baseline justify-between">
+            <div className="flex items-baseline justify-between gap-3">
               <div className="label-xs truncate">
                 {current ? siteArchetype(current) : "campus"} maquette
               </div>
-              <div className="label-xs shrink-0 pl-2 text-primary opacity-100">{current?.nom}</div>
-
-
+              <div className="flex shrink-0 items-baseline gap-3">
+                <div className="label-xs text-primary opacity-100">{current?.nom}</div>
+                {maquetteOpen ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMaquetteOpen(false);
+                    }}
+                    className="label-xs rounded-full border border-hairline px-3 py-1 transition-colors hover:border-primary/40"
+                  >
+                    Close
+                  </button>
+                ) : (
+                  <span className="label-xs opacity-55">Click to enlarge</span>
+                )}
+              </div>
             </div>
             <SiteMaquette3D
               site={(selected ?? stageSite) as Site}
               build={build}
               expanded={maquetteOpen}
-              className={maquetteOpen ? "mt-1 h-[calc(70vh-84px)] w-full" : "mt-1 h-[172px] w-full"}
+              className={maquetteOpen ? "mt-2 min-h-0 flex-1 w-full" : "mt-1 h-[172px] w-full"}
             />
-            <div className="label-xs flex justify-between opacity-70">
+            <div className="label-xs mt-1 flex shrink-0 justify-between opacity-70">
               <span>{build.turbines} turbines</span>
               <span>{build.pv_mw} MWp</span>
               <span>{build.batt_mwh} MWh</span>
             </div>
           </motion.div>
         )}
-
       </AnimatePresence>
 
       <div
@@ -325,12 +367,12 @@ function SitesPage() {
         }}
       >
       <AnimatePresence>
-        {selected && data && (
+        {selected && data && toolOpen && (
           <SiteDetail
             key={selected.id}
             site={selected}
             data={data}
-            onClose={() => setSelected(null)}
+            onClose={() => setToolOpen(false)}
             onBuild={onBuild}
             onPickSite={(s) => {
               setHovered(s.id);
