@@ -254,31 +254,7 @@ export function WorldMap({
       if (disposed || !container.current) return;
       map = new maplibregl.Map({
         container: container.current,
-        style: {
-          version: 8,
-          sources: {
-            basemap: {
-              type: "raster",
-              tiles: [
-                "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-                "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-                "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-              ],
-              tileSize: 256,
-              maxzoom: 19,
-              attribution: "© OpenStreetMap contributors © CARTO",
-            },
-          },
-          layers: [
-            { id: "bg", type: "background", paint: { "background-color": "#16222e" } },
-            {
-              id: "basemap",
-              type: "raster",
-              source: "basemap",
-              paint: { "raster-brightness-min": 0.06, "raster-contrast": 0.15, "raster-saturation": -0.05, "raster-opacity": 1 },
-            },
-          ],
-        },
+        style: osmDarkStyle(),
         center: [10, 25],
         zoom: 1.5,
         pitch: 0,
