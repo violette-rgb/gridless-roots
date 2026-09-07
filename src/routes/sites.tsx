@@ -156,6 +156,18 @@ function SitesPage() {
         >
           {railHidden ? "All sites" : "Hide list"}
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setToolOpen((v) => !v);
+            if (!selected && ordered.length) setSelected(current ?? ordered[0]);
+          }}
+          className="rounded-full border-primary/40 bg-background/70 px-4 text-[11px] uppercase tracking-[0.16em] text-primary backdrop-blur-md hover:bg-primary/10"
+        >
+          {selected && toolOpen ? "Hide tool" : "Open tool"}
+        </Button>
       </div>
 
       {/* Site index rail */}
