@@ -304,10 +304,12 @@ export function SiteMaquette3D({
   return (
     <div className={className}>
       <Canvas
+        key={expanded ? "expanded" : "compact"}
+        resize={{ debounce: 0, scroll: false }}
         dpr={[1, 1.75]}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
         camera={{ fov: 32, near: 0.5, far: 400, position: [26, 19, 26] }}
-        style={{ background: "transparent" }}
+        style={{ background: "transparent", width: "100%", height: "100%" }}
       >
         <hemisphereLight args={["#5fd8ff", "#05070a", 0.55]} />
         <directionalLight position={[18, 26, 10]} intensity={1.15} color="#dceaf6" />
