@@ -56,6 +56,7 @@ function SitesPage() {
   const [maquetteOpen, setMaquetteOpen] = useState(false);
   const [stageSiteId, setStageSiteId] = useState<string | null>(null);
   const [railOpen, setRailOpen] = useState(false);
+  const [toolOpen, setToolOpen] = useState(true);
   const [api, setApi] = useState<MapApi | null>(null);
   const [build, setBuild] = useState<BuildSpec>({
     turbines: REFERENCE_BUILD.turbines,
