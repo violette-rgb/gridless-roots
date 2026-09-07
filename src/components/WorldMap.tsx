@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { Map as MLMap, Marker as MLMarker } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { osmDarkStyle } from "@/lib/basemap";
 import {
   VERDICT_COLOR,
   siteVerdict,
