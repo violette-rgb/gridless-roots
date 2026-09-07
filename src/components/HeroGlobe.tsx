@@ -29,7 +29,7 @@ export function HeroGlobe() {
       if (cancelled || !container.current) return;
       map = new maplibregl.Map({
         container: container.current,
-        style: STYLE_URL,
+        style: osmDarkStyle(),
         center: [10, 35],
         zoom: 1.35,
         interactive: false,
