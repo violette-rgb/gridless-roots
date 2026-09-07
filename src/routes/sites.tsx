@@ -91,7 +91,10 @@ function SitesPage() {
       setMaquetteOpen(false);
       api?.flyToSite(next);
       // the instrument only reappears as the camera settles on the new site
-      window.setTimeout(() => setSelected(next), 2400);
+      window.setTimeout(() => {
+        setSelected(next);
+        setToolOpen(true);
+      }, 2400);
     },
     [api, current, ordered],
   );
@@ -107,7 +110,10 @@ function SitesPage() {
           selectedId={selected?.id ?? null}
           hoveredId={hovered}
           onHover={setHovered}
-          onSelect={setSelected}
+          onSelect={(s) => {
+            setSelected(s);
+            setToolOpen(true);
+          }}
           build={build}
           onStageChange={onStageChange}
           onReady={onReady}
@@ -192,7 +198,10 @@ function SitesPage() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => data?.sites[0] && setSelected(data.sites[0])}
+            onClick={() => {
+              if (data?.sites[0]) setSelected(data.sites[0]);
+              setToolOpen(true);
+            }}
             className="rounded-full border-primary/40 px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-primary hover:bg-primary/10"
           >
             Open instrument
@@ -222,6 +231,7 @@ function SitesPage() {
                     onClick={() => {
                       setHovered(s.id);
                       setSelected(s);
+                      setToolOpen(true);
                     }}
                     className={`group flex h-auto w-full items-baseline justify-between rounded-none border-b border-hairline px-0 py-2.5 text-left font-normal transition-opacity duration-300 hover:bg-transparent ${
                       active ? "opacity-100" : "opacity-70 hover:opacity-95"
